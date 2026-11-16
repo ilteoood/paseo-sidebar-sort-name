@@ -36,6 +36,7 @@ import {
   trailingLabels,
   workspaceSortLabels,
   workspaceSorts,
+  type Grouping,
   type Preferences,
   type RowItem,
   type TitleSource,
@@ -122,6 +123,8 @@ const menuInset = 8;
 const menuGap = 4;
 const menuPagePadding = 4;
 const menuBorderWidth = 1;
+const menuIconSize = 14;
+const submenuOverlap = 5;
 const filledDotSize = 6;
 const doneDotOpacity = 0.3;
 const titleIdleOpacity = 0.76;
@@ -137,6 +140,7 @@ type MenuEntry = {
   readonly selected?: boolean;
   readonly separatorBefore?: boolean;
   readonly keepOpen?: boolean;
+  readonly page?: DisplayPage;
   readonly onPress: () => void;
 };
 
@@ -153,6 +157,8 @@ const statusOrder: readonly PluginWorkspaceSnapshot["status"][] = [
   "attention",
   "done",
 ];
+const groupingIcons: Record<Grouping, string> = { project: "Folder", status: "CircleDashed" };
+const titleSourceIcons: Record<TitleSource, string> = { title: "Type", branch: "GitBranch" };
 const rowItemIcons: Record<RowItem, string> = {
   branch: "GitBranch",
   project: "Folder",
@@ -197,12 +203,40 @@ function optionEntries<Value extends string>(
   labels: Record<Value, string>,
   selected: Value,
   choose: (value: Value) => void,
+  icons?: Record<Value, string>,
 ): readonly MenuEntry[] {
   return values.map((value) => ({
+    icon: icons?.[value],
     label: labels[value],
     selected: value === selected,
     onPress: () => choose(value),
   }));
+}
+
+function submenuPlacement(
+  root: Rect,
+  parent: MenuPlacement,
+  parentEntries: readonly MenuEntry[],
+  page: DisplayPage,
+  cardHeight: number,
+): MenuPlacement {
+  const width = Math.min(menuWidth, root.width - menuInset * 2);
+  const triggerIndex = parentEntries.findIndex((entry) => entry.page === page);
+  const triggerOffset = parentEntries
+    .slice(0, Math.max(triggerIndex, 0))
+    .reduce(
+      (total, entry) =>
+        total + menuRowMinHeight + (entry.separatorBefore ? menuSeparatorHeight : 0),
+      menuBorderWidth + menuPagePadding,
+    );
+  const triggerTop = parent.top + triggerOffset;
+  const besideParent = parent.left + parent.width - submenuOverlap;
+  const left =
+    besideParent + width <= root.width - menuInset
+      ? besideParent
+      : Math.max(menuInset, parent.left - width + submenuOverlap);
+  const top = Math.max(menuInset, Math.min(triggerTop, root.height - cardHeight - menuInset));
+  return { top, left, width };
 }
 
 type PointerDocument = {
@@ -375,6 +409,7 @@ function FloatingMenu({
   entries,
   placement,
   maxHeight,
+  layer,
   page,
   view,
   onDismiss,
@@ -382,6 +417,7 @@ function FloatingMenu({
   entries: readonly MenuEntry[];
   placement: MenuPlacement;
   maxHeight: number;
+  layer: number;
   page: string;
   view: PluginSidebarViewProps;
   onDismiss: () => void;
@@ -389,18 +425,20 @@ function FloatingMenu({
   const { colors } = view.theme;
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Close the menu"
-        onPress={onDismiss}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
-      />
+      {layer === 11 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close the menu"
+          onPress={onDismiss}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
+        />
+      ) : null}
       <View
         accessibilityRole="menu"
         accessibilityViewIsModal
         style={{
           position: "absolute",
-          zIndex: 11,
+          zIndex: layer,
           top: placement.top,
           left: placement.left,
           width: placement.width,
@@ -448,7 +486,7 @@ function FloatingMenu({
                 })}
               >
                 {entry.icon ? (
-                  <Icon name={entry.icon} size={16} color={colors.foregroundMuted} />
+                  <Icon name={entry.icon} size={menuIconSize} color={colors.foregroundMuted} />
                 ) : null}
                 <Text numberOfLines={1} style={{ fontSize: 14, flex: 1, color: colors.foreground }}>
                   {entry.label}
@@ -1089,40 +1127,36 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
     keepOpen: true,
     onPress: () => showPage("root"),
   });
+  const pageEntry = (label: string, page: DisplayPage, value?: string): MenuEntry => ({
+    label,
+    value,
+    chevron: true,
+    keepOpen: true,
+    page,
+    onPress: () => showPage(page),
+  });
   const displayEntries = (page: DisplayPage): readonly MenuEntry[] => {
     if (page === "grouping") {
-      return [
-        pageHeader("Grouping"),
-        ...optionEntries(groupings, groupingLabels, values.grouping, (option) => {
-          apply({ grouping: option });
-        }),
-      ];
+      return optionEntries(groupings, groupingLabels, values.grouping, (option) =>
+        apply({ grouping: option }), groupingIcons);
     }
     if (page === "sort") {
-      return [
-        pageHeader("Sort"),
-        ...optionEntries(workspaceSorts, workspaceSortLabels, values.workspaceSort, (option) => {
-          apply({ workspaceSort: option });
-        }),
-      ];
+      return optionEntries(workspaceSorts, workspaceSortLabels, values.workspaceSort, (option) =>
+        apply({ workspaceSort: option }));
     }
     if (page === "title") {
-      return [
-        pageHeader("Title"),
-        ...optionEntries(titleSources, titleSourceLabels, values.titleSource, (option) => {
-          apply({ titleSource: option });
-        }),
-      ];
+      return optionEntries(titleSources, titleSourceLabels, values.titleSource, (option) =>
+        apply({ titleSource: option }), titleSourceIcons);
     }
     if (page === "show") {
       return [
-        pageHeader("Show"),
         ...rowItems.map((item) => ({
           icon: rowItemIcons[item],
           label: rowItemLabels[item],
           selected: values.rowItems[item],
           keepOpen: true,
-          onPress: () => apply({ rowItems: { ...values.rowItems, [item]: !values.rowItems[item] } }),
+          onPress: () =>
+            apply({ rowItems: { ...values.rowItems, [item]: !values.rowItems[item] } }),
         })),
         {
           icon: "Diff",
@@ -1137,93 +1171,63 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
           label: trailingLabels.timestamp,
           selected: values.trailing === "timestamp",
           keepOpen: true,
-          onPress: () => apply({ trailing: values.trailing === "timestamp" ? "none" : "timestamp" }),
+          onPress: () =>
+            apply({ trailing: values.trailing === "timestamp" ? "none" : "timestamp" }),
         },
       ];
     }
     if (page === "host") {
       return [
-        pageHeader("Host"),
+        {
+          label: "All hosts",
+          selected: values.hostFilters.length === 0,
+          keepOpen: true,
+          onPress: () => apply({ hostFilters: [] }),
+        },
         ...hosts.map((host) => ({
           label: host.label,
           selected: values.hostFilters.includes(host.serverId),
           keepOpen: true,
           onPress: () => apply({ hostFilters: toggledFilter(values.hostFilters, host.serverId) }),
         })),
-        ...(values.hostFilters.length > 0
-          ? [
-              {
-                label: "Clear host filter",
-                separatorBefore: true,
-                keepOpen: true,
-                onPress: () => apply({ hostFilters: [] }),
-              },
-            ]
-          : []),
       ];
     }
     if (page === "project") {
       return [
-        pageHeader("Project"),
+        {
+          label: "All projects",
+          selected: values.projectFilters.length === 0,
+          keepOpen: true,
+          onPress: () => apply({ projectFilters: [] }),
+        },
         ...projectChoices.map((group) => ({
           label: group.title ?? group.key,
           selected: values.projectFilters.includes(group.key),
           keepOpen: true,
           onPress: () => apply({ projectFilters: toggledFilter(values.projectFilters, group.key) }),
         })),
-        ...(values.projectFilters.length > 0
-          ? [
-              {
-                label: "Clear project filter",
-                separatorBefore: true,
-                keepOpen: true,
-                onPress: () => apply({ projectFilters: [] }),
-              },
-            ]
-          : []),
       ];
     }
     return [
-      {
-        label: "Grouping",
-        value: groupingLabels[values.grouping],
-        chevron: true,
-        onPress: () => showPage("grouping"),
-      },
+      pageEntry("Grouping", "grouping", groupingLabels[values.grouping]),
       ...(values.grouping === "project"
-        ? [
-            {
-              label: "Sort",
-              value: workspaceSortLabels[values.workspaceSort],
-              chevron: true,
-              onPress: () => showPage("sort"),
-            },
-          ]
+        ? [pageEntry("Sort", "sort", workspaceSortLabels[values.workspaceSort])]
         : []),
-      {
-        label: "Title",
-        value: titleSourceLabels[values.titleSource],
-        chevron: true,
-        onPress: () => showPage("title"),
-      },
-      { label: "Show", chevron: true, onPress: () => showPage("show") },
+      pageEntry("Title", "title", titleSourceLabels[values.titleSource]),
+      pageEntry("Show", "show"),
       ...(hosts.length > 1
         ? [
             {
-              label: "Host",
+              ...pageEntry("Host", "host"),
               dot: values.hostFilters.length > 0,
-              chevron: true,
               separatorBefore: true,
-              onPress: () => showPage("host"),
             },
           ]
         : []),
       {
-        label: "Project",
+        ...pageEntry("Project", "project"),
         dot: values.projectFilters.length > 0,
-        chevron: true,
         separatorBefore: hosts.length <= 1,
-        onPress: () => showPage("project"),
       },
       {
         label: "Show background",
@@ -1251,20 +1255,31 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
   }, [menu]);
 
   const { colors } = view.theme;
-  const menuEntries: readonly MenuEntry[] =
-    menu === null ? [] : menu.kind === "actions" ? menu.entries : displayEntries(menu.page);
-  const menuPlacementResult =
-    menu === null
+  const rootEntries: readonly MenuEntry[] =
+    menu === null ? [] : menu.kind === "actions" ? menu.entries : displayEntries("root");
+  const submenuPage: DisplayPage | null =
+    menu !== null && menu.kind === "display" && menu.page !== "root" ? menu.page : null;
+  const submenuEntries: readonly MenuEntry[] =
+    submenuPage === null ? [] : displayEntries(submenuPage);
+  const cardPlacement = (anchor: MenuAnchor, entries: readonly MenuEntry[]): MenuPlacement =>
+    menuPlacement(
+      anchor.root,
+      anchor.anchor,
+      Math.min(menuCardHeight(entries), anchor.root.height - menuInset * 2),
+    );
+  const rootPlacement = menu === null ? null : cardPlacement(menu, rootEntries);
+  const submenuCardHeight = Math.min(
+    menuCardHeight(submenuEntries),
+    (menu?.root.height ?? 0) - menuInset * 2,
+  );
+  const submenuPlacementResult =
+    menu === null || rootPlacement === null || submenuPage === null
       ? null
-      : menuPlacement(
-          menu.root,
-          menu.anchor,
-          Math.min(menuCardHeight(menuEntries), menu.root.height - menuInset * 2),
-        );
-  const menuMaxHeight =
-    menu === null || menuPlacementResult === null
+      : submenuPlacement(menu.root, rootPlacement, rootEntries, submenuPage, submenuCardHeight);
+  const cardMaxHeight = (placed: MenuPlacement | null): number =>
+    menu === null || placed === null
       ? 0
-      : Math.max(menuRowMinHeight, menu.root.height - menuPlacementResult.top - menuInset);
+      : Math.max(menuRowMinHeight, menu.root.height - placed.top - menuInset);
   return (
     <View
       ref={rootRef}
@@ -1352,11 +1367,23 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
               />
             ))}
       </ScrollView>
-      {menu && menuPlacementResult ? (
+      {menu && rootPlacement ? (
         <FloatingMenu
-          entries={menuEntries}
-          placement={menuPlacementResult}
-          maxHeight={menuMaxHeight}
+          entries={rootEntries}
+          placement={rootPlacement}
+          maxHeight={cardMaxHeight(rootPlacement)}
+          layer={11}
+          page="root"
+          view={view}
+          onDismiss={() => setMenu(null)}
+        />
+      ) : null}
+      {menu && submenuPlacementResult ? (
+        <FloatingMenu
+          entries={submenuEntries}
+          placement={submenuPlacementResult}
+          maxHeight={cardMaxHeight(submenuPlacementResult)}
+          layer={12}
           page={menu.kind === "display" ? menu.page : ""}
           view={view}
           onDismiss={() => setMenu(null)}
