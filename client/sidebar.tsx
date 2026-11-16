@@ -270,7 +270,7 @@ function menuPlacement(root: Rect, anchor: Rect, cardHeight: number): MenuPlacem
         ? below
         : Math.max(menuInset, anchor.top - root.top - menuGap - cardHeight),
     left: Math.min(
-      Math.max(menuInset, anchor.left - root.left + anchor.width - width),
+      Math.max(menuInset, anchor.left - root.left + menuInset),
       root.width - width - menuInset,
     ),
     width,
@@ -457,17 +457,20 @@ function WorkspaceRow({
   indented,
   view,
   onOpenActions,
+  menuAnchor,
 }: {
   reference: WorkspaceRef;
   indented?: boolean;
   view: PluginSidebarViewProps;
   onOpenActions: OpenMenu;
+  menuAnchor: View | null;
 }) {
   const workspace = useWorkspace(reference);
   const paseo = usePaseo();
   const toast = useToast();
   const reportFailure = useFailureReporter();
   const kebabRef = useRef<View | null>(null);
+  const rowRef = useRef<View | null>(null);
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -477,7 +480,8 @@ function WorkspaceRow({
   const label = workspaceDisplayName(workspace);
   const branch = workspace.branch;
   const pinned = workspace.pinnedAt !== null;
-  const showsChrome = hovered || isTouchPlatform;
+  const menuOpen = rowRef.current !== null && menuAnchor === rowRef.current;
+  const showsChrome = hovered || menuOpen || isTouchPlatform;
   const workspaceActions = () => paseo.workspaces.ref(reference);
   const submitRename = (draft: string) => {
     const name = draft.trim();
@@ -537,6 +541,7 @@ function WorkspaceRow({
   return (
     <>
       <View
+        ref={rowRef}
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
         style={{
@@ -546,7 +551,7 @@ function WorkspaceRow({
             ? pressedTint
             : active
               ? selectedTint
-              : hovered
+              : hovered || menuOpen
                 ? hoverTint
                 : undefined,
         }}
@@ -577,7 +582,7 @@ function WorkspaceRow({
                 lineHeight: 20,
                 flexShrink: 1,
                 color: view.theme.colors.foreground,
-                opacity: hovered || active ? 1 : titleIdleOpacity,
+                opacity: hovered || active || menuOpen ? 1 : titleIdleOpacity,
               }}
             >
               {label}
@@ -605,7 +610,7 @@ function WorkspaceRow({
           visible={showsChrome}
           view={view}
           onHoverChange={setHovered}
-          onPress={() => onOpenActions(kebabRef.current, entries)}
+          onPress={() => onOpenActions(rowRef.current, entries)}
         />
       </View>
       {renaming ? (
@@ -640,6 +645,7 @@ function ProjectSection({
   collapsed,
   onToggleCollapsed,
   onOpenActions,
+  menuAnchor,
 }: {
   reference: ProjectRef;
   sort: WorkspaceSort;
@@ -647,6 +653,7 @@ function ProjectSection({
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onOpenActions: OpenMenu;
+  menuAnchor: View | null;
 }) {
   const project = useProject(reference);
   const paseo = usePaseo();
@@ -654,6 +661,7 @@ function ProjectSection({
   const removeProject = useRpc(removeProjectRpc);
   const reportFailure = useFailureReporter();
   const kebabRef = useRef<View | null>(null);
+  const rowRef = useRef<View | null>(null);
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -665,7 +673,8 @@ function ProjectSection({
     orderBy: workspaceOrder[sort],
   });
   if (!project || workspaces.length === 0) return null;
-  const showsChrome = hovered || isTouchPlatform;
+  const menuOpen = rowRef.current !== null && menuAnchor === rowRef.current;
+  const showsChrome = hovered || menuOpen || isTouchPlatform;
   const confirmRemoval = () => {
     setConfirmingRemoval(false);
     reportFailure("Could not remove the project", async () => {
@@ -676,11 +685,12 @@ function ProjectSection({
   return (
     <View style={{ paddingBottom: 12 }}>
       <View
+        ref={rowRef}
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
         style={{
           ...projectRow,
-          backgroundColor: pressed ? pressedTint : hovered ? hoverTint : undefined,
+          backgroundColor: pressed ? pressedTint : hovered || menuOpen ? hoverTint : undefined,
         }}
       >
         <Pressable
@@ -732,7 +742,7 @@ function ProjectSection({
           view={view}
           onHoverChange={setHovered}
           onPress={() =>
-            onOpenActions(kebabRef.current, [
+            onOpenActions(rowRef.current, [
               { icon: "Trash2", label: "Remove project", onPress: () => setConfirmingRemoval(true) },
             ])
           }
@@ -747,6 +757,7 @@ function ProjectSection({
               indented
               view={view}
               onOpenActions={onOpenActions}
+              menuAnchor={menuAnchor}
             />
           ))}
       {confirmingRemoval ? (
@@ -825,6 +836,8 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
     <View ref={rootRef} collapsable={false} style={{ flex: 1 }}>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 8, paddingTop: 2, paddingBottom: 16 }}
+        onScroll={() => setMenu(null)}
+        scrollEventThrottle={16}
       >
         {pinned.length ? <SectionHeader title="Pinned" view={view} /> : null}
         {pinned.map((workspace) => (
@@ -833,6 +846,7 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
             reference={workspace}
             view={view}
             onOpenActions={openMenu}
+            menuAnchor={menu?.node ?? null}
           />
         ))}
         <SectionHeader title="Workspaces" view={view}>
@@ -867,6 +881,7 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
             collapsed={collapsedProjects.includes(project.key)}
             onToggleCollapsed={() => toggleCollapsed(project.key)}
             onOpenActions={openMenu}
+            menuAnchor={menu?.node ?? null}
           />
         ))}
       </ScrollView>
