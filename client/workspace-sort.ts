@@ -16,9 +16,16 @@ function newestFirst(left: string | null, right: string | null): number {
   return right.localeCompare(left);
 }
 
+export function workspaceDisplayName(workspace: PluginWorkspaceSnapshot): string {
+  return workspace.title ?? workspace.name;
+}
+
 export const workspaceOrder: Record<WorkspaceSort, Order> = {
   name: (left, right) =>
-    left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" }),
+    workspaceDisplayName(left).localeCompare(workspaceDisplayName(right), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }),
   created: (left, right) => newestFirst(left.createdAt, right.createdAt),
   lastPrompt: (left, right) => newestFirst(left.lastPromptAt, right.lastPromptAt),
 };
