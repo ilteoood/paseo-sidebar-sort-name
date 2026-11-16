@@ -1,6 +1,7 @@
 {
   "name": "paseo-sidebar-sort-name",
   "private": true,
+  "type": "module",
   "version": "0.0.0",
   "files": [
     "paseo-plugin.json",
@@ -12,11 +13,11 @@
     "shared/"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.16.0",
-    "@tanstack/react-query": "^5.90.11",
     "@types/node": "^26.6.6",
     "@types/react": "~19.2.0",
     "react": "19.1.0",

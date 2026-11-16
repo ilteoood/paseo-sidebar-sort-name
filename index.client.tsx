@@ -1,5 +1,5 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
-import { SortedSidebar } from "./client/sidebar";
+import { SortedSidebar } from "./client/sidebar.tsx";
 
 export default function contribute(client: PluginClientContext) {
   return client.addSidebarView({

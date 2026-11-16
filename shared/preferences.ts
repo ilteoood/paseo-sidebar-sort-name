@@ -1,7 +1,7 @@
 import { defineSettings } from "@getpaseo/plugin";
 import { z } from "zod";
 
-export const workspaceSorts = ["name", "created", "lastPrompt"] as const;
+export const workspaceSorts = ["created", "lastPrompt", "name"] as const;
 export const groupings = ["project", "status"] as const;
 export const titleSources = ["title", "branch"] as const;
 export const rowItems = ["branch", "project", "host", "status", "labels"] as const;
