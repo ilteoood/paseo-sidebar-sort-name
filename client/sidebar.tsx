@@ -270,7 +270,7 @@ function menuPlacement(root: Rect, anchor: Rect, cardHeight: number): MenuPlacem
         ? below
         : Math.max(menuInset, anchor.top - root.top - menuGap - cardHeight),
     left: Math.min(
-      Math.max(menuInset, anchor.left - root.left + menuInset),
+      Math.max(menuInset, anchor.left - root.left + anchor.width - width),
       root.width - width - menuInset,
     ),
     width,
