@@ -6,7 +6,7 @@ Projects stay alphabetical by project name under Name, and follow their first wo
 
 Every workspace row has an actions menu with New workspace, Copy path, Copy branch name, Rename workspace, Pin to top or Unpin, and Archive. The button is always visible on touch, and appears on hover or keyboard focus on desktop. The menu itself opens as a floating card beside the row, like the built-in flyouts, and closes on the next click outside it. Renaming to an empty name clears the custom title and the row falls back to the branch name.
 
-Pick the view in Settings, Sidebar, Sidebar view. The button at the right of the Workspaces header opens the same display preferences the built-in sidebar shows, as a floating card with one level of submenus:
+Pick the view in Settings, Sidebar, Sidebar view. The button at the right of the Workspaces header opens the same display preferences the built-in sidebar shows, as a floating card; a row with options replaces the card's content and its header row leads back:
 
 - Grouping: Project or Status.
 - Sort: Name, Created, or Last prompted. Contributed by this plugin; Name orders the rows by the title or the branch, whichever the Title setting shows.

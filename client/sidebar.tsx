@@ -124,9 +124,6 @@ const menuGap = 4;
 const menuPagePadding = 4;
 const menuBorderWidth = 1;
 const menuIconSize = 14;
-const submenuOverlap = 5;
-const hoverOpenDelay = 90;
-const hoverCloseGrace = 260;
 const filledDotSize = 6;
 const doneDotOpacity = 0.3;
 const titleIdleOpacity = 0.76;
@@ -213,28 +210,6 @@ function optionEntries<Value extends string>(
     selected: value === selected,
     onPress: () => choose(value),
   }));
-}
-
-function submenuPlacement(
-  root: Rect,
-  parent: MenuPlacement,
-  parentEntries: readonly MenuEntry[],
-  page: DisplayPage,
-  cardHeight: number,
-): MenuPlacement {
-  const width = Math.min(menuWidth, root.width - menuInset * 2);
-  const triggerIndex = parentEntries.findIndex((entry) => entry.page === page);
-  const triggerOffset = parentEntries
-    .slice(0, Math.max(triggerIndex, 0))
-    .reduce(
-      (total, entry) =>
-        total + menuRowMinHeight + (entry.separatorBefore ? menuSeparatorHeight : 0),
-      menuBorderWidth + menuPagePadding,
-    );
-  const triggerTop = parent.top + triggerOffset;
-  const top = Math.max(menuInset, Math.min(triggerTop, root.height - cardHeight - menuInset));
-  const besideParent = parent.left + parent.width - submenuOverlap;
-  return { top, left: Math.max(menuInset, Math.min(besideParent, root.width - width - menuInset)), width };
 }
 
 type PointerDocument = {
@@ -376,6 +351,15 @@ type MenuAnchor = {
 
 type DisplayPage = "root" | "grouping" | "sort" | "title" | "show" | "host" | "project";
 
+const displayPageTitles: Record<Exclude<DisplayPage, "root">, string> = {
+  grouping: "Grouping",
+  sort: "Sort",
+  title: "Title",
+  show: "Show",
+  host: "Host",
+  project: "Project",
+};
+
 type MenuRequest =
   | ({ readonly kind: "actions"; readonly entries: readonly MenuEntry[] } & MenuAnchor)
   | ({ readonly kind: "display"; readonly page: DisplayPage } & MenuAnchor);
@@ -407,43 +391,32 @@ function FloatingMenu({
   entries,
   placement,
   maxHeight,
-  layer,
   page,
   view,
   onDismiss,
-  onHoverEntry,
-  onHoverCard,
 }: {
   entries: readonly MenuEntry[];
   placement: MenuPlacement;
   maxHeight: number;
-  layer: number;
   page: string;
   view: PluginSidebarViewProps;
   onDismiss: () => void;
-  onHoverEntry: (entry: MenuEntry | null) => void;
-  onHoverCard: (inside: boolean) => void;
 }) {
   const { colors } = view.theme;
   return (
     <>
-      {layer === 11 ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close the menu"
-          onPress={onDismiss}
-          onPointerEnter={() => onHoverCard(false)}
-          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
-        />
-      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Close the menu"
+        onPress={onDismiss}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
+      />
       <View
         accessibilityRole="menu"
         accessibilityViewIsModal
-        onPointerEnter={() => onHoverCard(true)}
-        onPointerLeave={() => onHoverCard(false)}
         style={{
           position: "absolute",
-          zIndex: layer,
+          zIndex: 11,
           top: placement.top,
           left: placement.left,
           width: placement.width,
@@ -484,8 +457,6 @@ function FloatingMenu({
                   if (!entry.keepOpen) onDismiss();
                   entry.onPress();
                 }}
-                onPointerEnter={() => onHoverEntry(entry)}
-                onPointerLeave={() => onHoverEntry(null)}
                 style={({ pressed }) => ({
                   ...menuRow,
                   cursor: "pointer",
@@ -1101,25 +1072,6 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
     orderBy,
   });
 
-  const hoverTimers = useRef<{ open?: ReturnType<typeof setTimeout>; close?: ReturnType<typeof setTimeout> }>({});
-  const cancelHoverTimers = () => {
-    if (hoverTimers.current.open) clearTimeout(hoverTimers.current.open);
-    if (hoverTimers.current.close) clearTimeout(hoverTimers.current.close);
-    hoverTimers.current = {};
-  };
-  useEffect(() => cancelHoverTimers, []);
-  const hoverEntry = (entry: MenuEntry | null) => {
-    cancelHoverTimers();
-    const page = entry?.page;
-    if (page === undefined) return;
-    hoverTimers.current.open = setTimeout(() => showPage(page), hoverOpenDelay);
-  };
-  const hoverCard = (inside: boolean) => {
-    cancelHoverTimers();
-    if (inside) return;
-    hoverTimers.current.close = setTimeout(() => showPage("root"), hoverCloseGrace);
-  };
-
   const toggleCollapsed = (key: string) =>
     setCollapsedProjects((current) =>
       current.includes(key) ? current.filter((other) => other !== key) : [...current, key],
@@ -1155,7 +1107,7 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
     page,
     onPress: () => showPage(page),
   });
-  const displayEntries = (page: DisplayPage): readonly MenuEntry[] => {
+  const pageEntries = (page: DisplayPage): readonly MenuEntry[] => {
     if (page === "grouping") {
       return optionEntries(groupings, groupingLabels, values.grouping, (option) =>
         apply({ grouping: option }), groupingIcons);
@@ -1258,6 +1210,19 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
       },
     ];
   };
+  const displayEntries = (page: DisplayPage): readonly MenuEntry[] => {
+    const entries = pageEntries(page);
+    if (page === "root") return entries;
+    return [
+      {
+        icon: "ChevronLeft",
+        label: displayPageTitles[page],
+        keepOpen: true,
+        onPress: () => showPage("root"),
+      },
+      ...entries,
+    ];
+  };
 
   useEffect(() => {
     if (!menu) return;
@@ -1275,31 +1240,20 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
   }, [menu]);
 
   const { colors } = view.theme;
-  const rootEntries: readonly MenuEntry[] =
-    menu === null ? [] : menu.kind === "actions" ? menu.entries : displayEntries("root");
-  const submenuPage: DisplayPage | null =
-    menu !== null && menu.kind === "display" && menu.page !== "root" ? menu.page : null;
-  const submenuEntries: readonly MenuEntry[] =
-    submenuPage === null ? [] : displayEntries(submenuPage);
-  const cardPlacement = (anchor: MenuAnchor, entries: readonly MenuEntry[]): MenuPlacement =>
-    menuPlacement(
-      anchor.root,
-      anchor.anchor,
-      Math.min(menuCardHeight(entries), anchor.root.height - menuInset * 2),
-    );
-  const rootPlacement = menu === null ? null : cardPlacement(menu, rootEntries);
-  const submenuCardHeight = Math.min(
-    menuCardHeight(submenuEntries),
-    (menu?.root.height ?? 0) - menuInset * 2,
-  );
-  const submenuPlacementResult =
-    menu === null || rootPlacement === null || submenuPage === null
+  const menuEntries: readonly MenuEntry[] =
+    menu === null ? [] : menu.kind === "actions" ? menu.entries : displayEntries(menu.page);
+  const menuPlacementResult =
+    menu === null
       ? null
-      : submenuPlacement(menu.root, rootPlacement, rootEntries, submenuPage, submenuCardHeight);
-  const cardMaxHeight = (placed: MenuPlacement | null): number =>
-    menu === null || placed === null
+      : menuPlacement(
+          menu.root,
+          menu.anchor,
+          Math.min(menuCardHeight(menuEntries), menu.root.height - menuInset * 2),
+        );
+  const menuMaxHeight =
+    menu === null || menuPlacementResult === null
       ? 0
-      : Math.max(menuRowMinHeight, menu.root.height - placed.top - menuInset);
+      : Math.max(menuRowMinHeight, menu.root.height - menuPlacementResult.top - menuInset);
   return (
     <View
       ref={rootRef}
@@ -1387,30 +1341,14 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
               />
             ))}
       </ScrollView>
-      {menu && rootPlacement ? (
+      {menu && menuPlacementResult ? (
         <FloatingMenu
-          entries={rootEntries}
-          placement={rootPlacement}
-          maxHeight={cardMaxHeight(rootPlacement)}
-          layer={11}
-          page="root"
-          view={view}
-          onDismiss={() => setMenu(null)}
-          onHoverEntry={hoverEntry}
-          onHoverCard={hoverCard}
-        />
-      ) : null}
-      {menu && submenuPlacementResult ? (
-        <FloatingMenu
-          entries={submenuEntries}
-          placement={submenuPlacementResult}
-          maxHeight={cardMaxHeight(submenuPlacementResult)}
-          layer={12}
+          entries={menuEntries}
+          placement={menuPlacementResult}
+          maxHeight={menuMaxHeight}
           page={menu.kind === "display" ? menu.page : ""}
           view={view}
           onDismiss={() => setMenu(null)}
-          onHoverEntry={hoverEntry}
-          onHoverCard={hoverCard}
         />
       ) : null}
     </View>
