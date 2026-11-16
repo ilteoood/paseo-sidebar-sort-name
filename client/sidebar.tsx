@@ -638,6 +638,28 @@ function removalMessage(removedWorkspaceCount: number): string {
   const noun = removedWorkspaceCount === 1 ? "workspace" : "workspaces";
   return `Project removed with ${removedWorkspaceCount} ${noun}`;
 }
+
+type BrowserWindow = {
+  readonly history: { pushState(data: unknown, unused: string, url: string): void };
+  readonly dispatchEvent: (event: unknown) => boolean;
+  readonly PopStateEvent: new (type: string) => unknown;
+};
+
+// shortcut: the plugin API has no route to the app's settings, so this drives the app router through the browser history react-navigation listens on; native returns false.
+function openProjectSettings(reference: ProjectRef): boolean {
+  const browser = (globalThis as { window?: BrowserWindow }).window;
+  if (typeof browser?.history?.pushState !== "function") return false;
+  if (typeof browser.PopStateEvent !== "function") return false;
+  const hostId = encodeURIComponent(reference.hostId);
+  const projectId = encodeURIComponent(reference.id);
+  try {
+    browser.history.pushState(null, "", `/settings/hosts/${hostId}/projects/${projectId}`);
+    browser.dispatchEvent(new browser.PopStateEvent("popstate"));
+    return true;
+  } catch {
+    return false;
+  }
+}
 function ProjectSection({
   reference,
   sort,
@@ -743,6 +765,15 @@ function ProjectSection({
           onHoverChange={setHovered}
           onPress={() =>
             onOpenActions(rowRef.current, [
+              {
+                icon: "Settings",
+                label: "Open project settings",
+                onPress: () => {
+                  if (!openProjectSettings(reference)) {
+                    toast.error("Project settings open in the desktop app only");
+                  }
+                },
+              },
               { icon: "Trash2", label: "Remove project", onPress: () => setConfirmingRemoval(true) },
             ])
           }
