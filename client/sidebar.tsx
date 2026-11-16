@@ -125,6 +125,8 @@ const menuPagePadding = 4;
 const menuBorderWidth = 1;
 const menuIconSize = 14;
 const submenuOverlap = 5;
+const hoverOpenDelay = 90;
+const hoverCloseGrace = 260;
 const filledDotSize = 6;
 const doneDotOpacity = 0.3;
 const titleIdleOpacity = 0.76;
@@ -230,13 +232,9 @@ function submenuPlacement(
       menuBorderWidth + menuPagePadding,
     );
   const triggerTop = parent.top + triggerOffset;
-  const besideParent = parent.left + parent.width - submenuOverlap;
-  const left =
-    besideParent + width <= root.width - menuInset
-      ? besideParent
-      : Math.max(menuInset, parent.left - width + submenuOverlap);
   const top = Math.max(menuInset, Math.min(triggerTop, root.height - cardHeight - menuInset));
-  return { top, left, width };
+  const besideParent = parent.left + parent.width - submenuOverlap;
+  return { top, left: Math.max(menuInset, Math.min(besideParent, root.width - width - menuInset)), width };
 }
 
 type PointerDocument = {
@@ -413,6 +411,8 @@ function FloatingMenu({
   page,
   view,
   onDismiss,
+  onHoverEntry,
+  onHoverCard,
 }: {
   entries: readonly MenuEntry[];
   placement: MenuPlacement;
@@ -421,6 +421,8 @@ function FloatingMenu({
   page: string;
   view: PluginSidebarViewProps;
   onDismiss: () => void;
+  onHoverEntry: (entry: MenuEntry | null) => void;
+  onHoverCard: (inside: boolean) => void;
 }) {
   const { colors } = view.theme;
   return (
@@ -430,12 +432,15 @@ function FloatingMenu({
           accessibilityRole="button"
           accessibilityLabel="Close the menu"
           onPress={onDismiss}
+          onPointerEnter={() => onHoverCard(false)}
           style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
         />
       ) : null}
       <View
         accessibilityRole="menu"
         accessibilityViewIsModal
+        onPointerEnter={() => onHoverCard(true)}
+        onPointerLeave={() => onHoverCard(false)}
         style={{
           position: "absolute",
           zIndex: layer,
@@ -479,6 +484,8 @@ function FloatingMenu({
                   if (!entry.keepOpen) onDismiss();
                   entry.onPress();
                 }}
+                onPointerEnter={() => onHoverEntry(entry)}
+                onPointerLeave={() => onHoverEntry(null)}
                 style={({ pressed }) => ({
                   ...menuRow,
                   cursor: "pointer",
@@ -1094,6 +1101,25 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
     orderBy,
   });
 
+  const hoverTimers = useRef<{ open?: ReturnType<typeof setTimeout>; close?: ReturnType<typeof setTimeout> }>({});
+  const cancelHoverTimers = () => {
+    if (hoverTimers.current.open) clearTimeout(hoverTimers.current.open);
+    if (hoverTimers.current.close) clearTimeout(hoverTimers.current.close);
+    hoverTimers.current = {};
+  };
+  useEffect(() => cancelHoverTimers, []);
+  const hoverEntry = (entry: MenuEntry | null) => {
+    cancelHoverTimers();
+    const page = entry?.page;
+    if (page === undefined) return;
+    hoverTimers.current.open = setTimeout(() => showPage(page), hoverOpenDelay);
+  };
+  const hoverCard = (inside: boolean) => {
+    cancelHoverTimers();
+    if (inside) return;
+    hoverTimers.current.close = setTimeout(() => showPage("root"), hoverCloseGrace);
+  };
+
   const toggleCollapsed = (key: string) =>
     setCollapsedProjects((current) =>
       current.includes(key) ? current.filter((other) => other !== key) : [...current, key],
@@ -1121,12 +1147,6 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
     anchorMenu(node, (anchor) => ({ kind: "actions", entries, ...anchor }));
   const openDisplayMenu = (node: View | null) =>
     anchorMenu(node, (anchor) => ({ kind: "display", page: "root", ...anchor }));
-  const pageHeader = (title: string): MenuEntry => ({
-    icon: "ChevronLeft",
-    label: title,
-    keepOpen: true,
-    onPress: () => showPage("root"),
-  });
   const pageEntry = (label: string, page: DisplayPage, value?: string): MenuEntry => ({
     label,
     value,
@@ -1376,6 +1396,8 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
           page="root"
           view={view}
           onDismiss={() => setMenu(null)}
+          onHoverEntry={hoverEntry}
+          onHoverCard={hoverCard}
         />
       ) : null}
       {menu && submenuPlacementResult ? (
@@ -1387,6 +1409,8 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
           page={menu.kind === "display" ? menu.page : ""}
           view={view}
           onDismiss={() => setMenu(null)}
+          onHoverEntry={hoverEntry}
+          onHoverCard={hoverCard}
         />
       ) : null}
     </View>
