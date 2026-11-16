@@ -4,7 +4,7 @@ Paseo itself always lists projects alphabetically, but the sidebar's Sort menu o
 
 Projects stay alphabetical by project name. Workspaces are grouped under their project, pinned workspaces sit in a Pinned section above, and the rows use the same density as the built-in sidebar. Background workspaces are hidden, as in the built-in sidebar. Clicking a project row collapses or expands it, and its trailing button opens the new-workspace screen for that project.
 
-Every workspace row has an actions menu with New workspace, Copy path, Copy branch name, Rename workspace, Pin to top or Unpin, and Archive. The button is always visible on touch, and appears on hover or keyboard focus on desktop. The menu itself opens as a floating card beside the row, like the built-in flyouts, and closes on the next click elsewhere in the sidebar. Renaming to an empty name clears the custom title and the row falls back to the branch name.
+Every workspace row has an actions menu with New workspace, Copy path, Copy branch name, Rename workspace, Pin to top or Unpin, and Archive. The button is always visible on touch, and appears on hover or keyboard focus on desktop. The menu itself opens as a floating card beside the row, like the built-in flyouts, and closes on the next click outside it. Renaming to an empty name clears the custom title and the row falls back to the branch name.
 
 Pick the view in Settings, Sidebar, Sidebar view. Choose the workspace order from the Sort control at the right of the Workspaces header, which opens the same floating card: Name, Created, or Last prompted. The choice is stored on the device, so each client can keep its own order. Paseo 0.16.0 or newer is required.
 

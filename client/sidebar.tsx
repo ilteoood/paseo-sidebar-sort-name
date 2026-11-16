@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import type { WorkspaceIndicator } from "@getpaseo/plugin";
 import {
@@ -62,7 +62,16 @@ const workspaceRow = {
   gap: 4,
 } as const;
 const leadingSlot = { width: 16, height: 20, alignItems: "center", justifyContent: "center" } as const;
-const trailingSlot = { width: 24, height: 24, alignItems: "center", justifyContent: "center" } as const;
+const trailingSlot = {
+  width: 32,
+  height: 32,
+  marginVertical: -6,
+  marginRight: -4,
+  alignSelf: "center",
+  borderRadius: 6,
+  alignItems: "center",
+  justifyContent: "center",
+} as const;
 const isTouchPlatform = Platform.OS !== "web";
 const menuRowMinHeight = isTouchPlatform ? 44 : 28;
 const menuRow = {
@@ -97,6 +106,11 @@ type MenuEntry = {
   readonly label: string;
   readonly selected?: boolean;
   readonly onPress: () => void;
+};
+
+type PointerDocument = {
+  addEventListener: (type: string, listener: (event: { target: unknown }) => void) => void;
+  removeEventListener: (type: string, listener: (event: { target: unknown }) => void) => void;
 };
 
 function useFailureReporter() {
@@ -263,11 +277,7 @@ function FloatingMenu({
               backgroundColor: pressed ? pressedTint : undefined,
             })}
           >
-            {entry.icon ? (
-              <Icon name={entry.icon} size={16} color={colors.foregroundMuted} />
-            ) : (
-              <View style={{ width: 16 }} />
-            )}
+            {entry.icon ? <Icon name={entry.icon} size={16} color={colors.foregroundMuted} /> : null}
             <Text numberOfLines={1} style={{ fontSize: 14, flex: 1, color: colors.foreground }}>
               {entry.label}
             </Text>
@@ -633,6 +643,18 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
       measureInWindow(node, place);
     });
   };
+  useEffect(() => {
+    if (!menu) return;
+    const pointerDocument = (globalThis as { document?: PointerDocument }).document;
+    if (!pointerDocument) return;
+    const dismissOutsideSidebar = (event: { target: unknown }) => {
+      const root = rootRef.current as unknown as { contains?: (node: unknown) => boolean } | null;
+      if (root?.contains?.(event.target)) return;
+      setMenu(null);
+    };
+    pointerDocument.addEventListener("pointerdown", dismissOutsideSidebar);
+    return () => pointerDocument.removeEventListener("pointerdown", dismissOutsideSidebar);
+  }, [menu]);
   const { colors } = view.theme;
   return (
     <View ref={rootRef} collapsable={false} style={{ flex: 1 }}>
