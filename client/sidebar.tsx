@@ -4,6 +4,7 @@ import { Platform, Pressable, Text, View } from "react-native";
 import type { PressableStateCallbackType } from "react-native";
 import type { PluginWorkspaceSnapshot, WorkspaceIndicator } from "@getpaseo/plugin";
 import {
+  type PluginHostSummary,
   useHosts,
   usePaseo,
   useProject,
@@ -137,6 +138,7 @@ type MenuEntry = {
   readonly value?: string;
   readonly chevron?: boolean;
   readonly dot?: boolean;
+  readonly leadingDot?: string;
   readonly selected?: boolean;
   readonly separatorBefore?: boolean;
   readonly keepOpen?: boolean;
@@ -170,6 +172,15 @@ const menuSeparatorHeight = 9;
 function statusRank(status: string): number {
   const index = statusOrder.indexOf(status as PluginWorkspaceSnapshot["status"]);
   return index === -1 ? statusOrder.length : index;
+}
+
+function hostStatusColor(
+  status: PluginHostSummary["status"],
+  colors: PluginSidebarViewProps["theme"]["colors"],
+): string {
+  if (status === "online") return colors.statusSuccess;
+  if (status === "connecting") return colors.statusWarning;
+  return colors.statusDanger;
 }
 
 function toggledFilter(filters: readonly string[], value: string): string[] {
@@ -464,6 +475,18 @@ function FloatingMenu({
                   backgroundColor: hovered || pressed ? colors.surface2 : undefined,
                 })}
               >
+                {entry.leadingDot ? (
+                  <View style={{ width: menuIconSize, alignItems: "center" }}>
+                    <View
+                      style={{
+                        width: filledDotSize,
+                        height: filledDotSize,
+                        borderRadius: filledDotSize / 2,
+                        backgroundColor: entry.leadingDot,
+                      }}
+                    />
+                  </View>
+                ) : null}
                 {entry.icon ? (
                   <Icon name={entry.icon} size={menuIconSize} color={colors.foregroundMuted} />
                 ) : null}
@@ -1014,7 +1037,6 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
   const settings = useSettings(preferences);
   const toast = useToast();
   const hosts = useHosts();
-  const onlineHosts = hosts.filter((host) => host.status === "online");
   const hostLabels = new Map(hosts.map((host) => [host.serverId, host.label]));
   const rootRef = useRef<View | null>(null);
   const displayTriggerRef = useRef<View | null>(null);
@@ -1158,8 +1180,9 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
           keepOpen: true,
           onPress: () => apply({ hostFilters: [] }),
         },
-        ...onlineHosts.map((host) => ({
-          label: host.label,
+        ...hosts.map((host) => ({
+          label: host.label.trim() || host.serverId,
+          leadingDot: hostStatusColor(host.status, view.theme.colors),
           selected: values.hostFilters.includes(host.serverId),
           keepOpen: true,
           onPress: () => apply({ hostFilters: toggledFilter(values.hostFilters, host.serverId) }),
