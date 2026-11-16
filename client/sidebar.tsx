@@ -820,6 +820,20 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
   const [collapsedProjects, setCollapsedProjects] = useState<readonly string[]>([]);
   const sort = settings.status === "ready" ? settings.values.workspaceSort : "name";
   const projects = useProjects({ orderBy: compareProjectNames });
+  const projectsByRank = useWorkspaces({
+    where: (workspace) => workspace.pinnedAt === null && !workspace.background,
+    orderBy: workspaceOrder[sort],
+    groupBy: (workspace) => workspace.project.key,
+  });
+  const projectRank = new Map(projectsByRank.map((group, index) => [group.key, index]));
+  const orderedProjects =
+    sort === "name"
+      ? projects
+      : [...projects].sort(
+          (left, right) =>
+            (projectRank.get(left.key) ?? Number.MAX_SAFE_INTEGER) -
+            (projectRank.get(right.key) ?? Number.MAX_SAFE_INTEGER),
+        );
   const pinned = useWorkspaces({
     where: (workspace) => workspace.pinnedAt !== null && !workspace.background,
     orderBy: workspaceOrder[sort],
@@ -903,7 +917,7 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
             <Icon name="ChevronsUpDown" size={12} color={colors.foregroundMuted} />
           </Pressable>
         </SectionHeader>
-        {projects.map((project) => (
+        {orderedProjects.map((project) => (
           <ProjectSection
             key={project.key}
             reference={project}
