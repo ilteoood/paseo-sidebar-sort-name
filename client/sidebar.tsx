@@ -161,16 +161,9 @@ function TrailingAction({
       accessibilityLabel={label}
       onFocus={() => onHoverChange(true)}
       onBlur={() => onHoverChange(false)}
-      onPress={(event) => {
-        event.stopPropagation();
-        onPress();
-      }}
+      onPress={onPress}
       pointerEvents={visible ? "auto" : "none"}
-      style={({ hovered }: ActionPressState) => ({
-        ...trailingHitBox,
-        cursor: "pointer",
-        opacity: visible ? 1 : 0,
-      })}
+      style={{ ...trailingHitBox, cursor: "pointer", opacity: visible ? 1 : 0 }}
     >
       {({ hovered, pressed }: ActionPressState) => (
         <View
@@ -421,6 +414,7 @@ function WorkspaceRow({
   const reportFailure = useFailureReporter();
   const kebabRef = useRef<View | null>(null);
   const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const active = view.active.workspace?.key === reference.key;
   if (!workspace) return null;
@@ -487,17 +481,12 @@ function WorkspaceRow({
 
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${label}`}
-        accessibilityState={{ selected: active }}
-        onHoverIn={() => setHovered(true)}
-        onHoverOut={() => setHovered(false)}
-        onPress={() => view.navigation.openWorkspace(reference)}
-        style={({ pressed }) => ({
+      <View
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        style={{
           ...workspaceRow,
           paddingLeft: indented ? 16 : 8,
-          cursor: "pointer",
           backgroundColor: pressed
             ? pressedTint
             : active
@@ -505,9 +494,23 @@ function WorkspaceRow({
               : hovered
                 ? hoverTint
                 : undefined,
-        })}
+        }}
       >
-        <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${label}`}
+          accessibilityState={{ selected: active }}
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+          onPress={() => view.navigation.openWorkspace(reference)}
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 8,
+            cursor: "pointer",
+          }}
+        >
           <View style={leadingSlot}>
             <StatusIndicator indicator={workspace.indicator} view={view} />
           </View>
@@ -538,7 +541,7 @@ function WorkspaceRow({
               </Text>
             ) : null}
           </View>
-        </View>
+        </Pressable>
         <TrailingAction
           actionRef={kebabRef}
           icon="EllipsisVertical"
@@ -549,7 +552,7 @@ function WorkspaceRow({
           onHoverChange={setHovered}
           onPress={() => onOpenActions(kebabRef.current, entries)}
         />
-      </Pressable>
+      </View>
       {renaming ? (
         <Modal
           title="Rename workspace"
@@ -589,6 +592,7 @@ function ProjectSection({
   const paseo = usePaseo();
   const reportFailure = useFailureReporter();
   const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const workspaces = useWorkspaces({
     where: (workspace) =>
       workspace.project.key === reference.key &&
@@ -600,36 +604,41 @@ function ProjectSection({
   const showsChrome = hovered || isTouchPlatform;
   return (
     <View style={{ paddingBottom: 12 }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${collapsed ? "Expand" : "Collapse"} ${project.displayName}`}
-        accessibilityState={{ expanded: !collapsed }}
-        onHoverIn={() => setHovered(true)}
-        onHoverOut={() => setHovered(false)}
-        onPress={onToggleCollapsed}
+      <View
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
         style={{
           ...projectRow,
-          cursor: "pointer",
-          backgroundColor: hovered ? hoverTint : undefined,
+          backgroundColor: pressed ? pressedTint : hovered ? hoverTint : undefined,
         }}
       >
-        <View style={leadingSlot}>
-          {showsChrome ? (
-            <Icon
-              name={collapsed ? "ChevronRight" : "ChevronDown"}
-              size={14}
-              color={view.theme.colors.foregroundMuted}
-            />
-          ) : (
-            <Icon name="Folder" size={16} color={view.theme.colors.foregroundMuted} />
-          )}
-        </View>
-        <Text
-          numberOfLines={1}
-          style={{ fontSize: 14, flex: 1, color: view.theme.colors.foregroundMuted }}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${collapsed ? "Expand" : "Collapse"} ${project.displayName}`}
+          accessibilityState={{ expanded: !collapsed }}
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+          onPress={onToggleCollapsed}
+          style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer" }}
         >
-          {project.displayName}
-        </Text>
+          <View style={leadingSlot}>
+            {showsChrome ? (
+              <Icon
+                name={collapsed ? "ChevronRight" : "ChevronDown"}
+                size={14}
+                color={view.theme.colors.foregroundMuted}
+              />
+            ) : (
+              <Icon name="Folder" size={16} color={view.theme.colors.foregroundMuted} />
+            )}
+          </View>
+          <Text
+            numberOfLines={1}
+            style={{ fontSize: 14, flex: 1, color: view.theme.colors.foregroundMuted }}
+          >
+            {project.displayName}
+          </Text>
+        </Pressable>
         <TrailingAction
           icon="Plus"
           iconSize={15}
@@ -643,7 +652,7 @@ function ProjectSection({
             )
           }
         />
-      </Pressable>
+      </View>
       {collapsed
         ? null
         : workspaces.map((workspace) => (
@@ -702,6 +711,7 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
     const pointerDocument = (globalThis as { document?: PointerDocument }).document;
     if (!pointerDocument) return;
     const dismissOutsideSidebar = (event: { target: unknown }) => {
+      // SAFETY: on web the kit's View ref is the DOM node, so it answers contains(); native has no document and never runs this effect.
       const root = rootRef.current as unknown as { contains?: (node: unknown) => boolean } | null;
       if (root?.contains?.(event.target)) return;
       setMenu(null);
