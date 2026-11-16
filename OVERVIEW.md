@@ -11,7 +11,7 @@ Pick the view in Settings, Sidebar, Sidebar view. The button at the right of the
 - Grouping: Project or Status.
 - Sort: Name, Created, or Last prompted. Contributed by this plugin; Name orders the rows by the title or the branch, whichever the Title setting shows.
 - Title: the custom title or the branch name.
-- Show: whether a row carries the branch, the project, the host, and the labels, plus a trailing diff or timestamp.
+- Show: whether a row's detail line carries the branch, the project, the host, the workspace status and the labels, plus a trailing diff or timestamp. The items share one line, separated by dots.
 - Host and Project: narrow the list, several at a time, marked with a dot while active. Each host row carries a dot in the colour of its connection state: online, connecting or disconnected.
 - Show background: includes the workspaces hidden from the sidebar.
 

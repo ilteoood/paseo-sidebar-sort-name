@@ -165,9 +165,42 @@ const rowItemIcons: Record<RowItem, string> = {
   branch: "GitBranch",
   project: "Folder",
   host: "Server",
+  status: "CircleDashed",
   labels: "Tag",
 };
 const menuSeparatorHeight = 9;
+
+type MetaItem = {
+  readonly key: string;
+  readonly icon: string;
+  readonly text: string;
+  readonly color?: string;
+};
+
+const statusItemIcons: Record<WorkspaceIndicator, string> = {
+  needs_input: "CircleAlert",
+  failed: "CircleX",
+  running: "LoaderCircle",
+  attention: "CircleCheck",
+  done: "CircleDashed",
+};
+const statusItemTexts: Record<WorkspaceIndicator, string> = {
+  needs_input: "Needs input",
+  failed: "Failed",
+  running: "Working",
+  attention: "Ready to review",
+  done: "Done",
+};
+
+function statusItemColor(
+  indicator: WorkspaceIndicator,
+  colors: PluginSidebarViewProps["theme"]["colors"],
+): string {
+  if (indicator === "failed") return colors.statusDanger;
+  if (indicator === "attention") return colors.statusSuccess;
+  if (indicator === "needs_input" || indicator === "running") return colors.statusWarning;
+  return colors.foregroundMuted;
+}
 
 function statusRank(status: string): number {
   const index = statusOrder.indexOf(status as PluginWorkspaceSnapshot["status"]);
@@ -664,14 +697,26 @@ function WorkspaceRow({
   const branch = workspace.branch;
   const pinned = workspace.pinnedAt !== null;
   const hostLabel = hostLabels.get(workspace.hostId) ?? workspace.hostId;
-  const metaLines = [
-    ...(display.rowItems.branch && branch ? [{ icon: "GitBranch", text: branch }] : []),
-    ...(display.rowItems.project
-      ? [{ icon: "Folder", text: workspace.projectDisplayName }]
+  const statusItem: MetaItem | null =
+    display.rowItems.status && workspace.indicator !== "done"
+      ? {
+          key: "status",
+          icon: statusItemIcons[workspace.indicator],
+          text: workspace.indicatorLabel ?? statusItemTexts[workspace.indicator],
+          color: statusItemColor(workspace.indicator, view.theme.colors),
+        }
+      : null;
+  const metaItems: readonly MetaItem[] = [
+    ...(display.rowItems.branch && branch
+      ? [{ key: "branch", icon: "GitBranch", text: branch }]
       : []),
-    ...(display.rowItems.host ? [{ icon: "Server", text: hostLabel }] : []),
+    ...(display.rowItems.project
+      ? [{ key: "project", icon: "Folder", text: workspace.projectDisplayName }]
+      : []),
+    ...(display.rowItems.host ? [{ key: "host", icon: "Server", text: hostLabel }] : []),
+    ...(statusItem ? [statusItem] : []),
     ...(display.rowItems.labels && workspace.labels.length > 0
-      ? [{ icon: "Tag", text: workspace.labels.join(", ") }]
+      ? [{ key: "labels", icon: "Tag", text: workspace.labels.join(", ") }]
       : []),
   ];
   const trailingText =
@@ -774,7 +819,7 @@ function WorkspaceRow({
           <View style={leadingSlot}>
             <StatusIndicator indicator={workspace.indicator} view={view} />
           </View>
-          <View style={{ flex: 1, gap: 2 }}>
+          <View style={{ flex: 1 }}>
             <Text
               numberOfLines={1}
               style={{
@@ -787,25 +832,51 @@ function WorkspaceRow({
             >
               {label}
             </Text>
-            {metaLines.map((line) => (
-              <View
-                key={line.icon}
-                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-              >
-                <Icon name={line.icon} size={11} color={view.theme.colors.foregroundMuted} />
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: 12,
-                    lineHeight: 16,
-                    flexShrink: 1,
-                    color: view.theme.colors.foregroundMuted,
-                  }}
-                >
-                  {line.text}
-                </Text>
+            {metaItems.length > 0 ? (
+              <View style={{ flexDirection: "row", alignItems: "center", minWidth: 0 }}>
+                {metaItems.map((item, index) => (
+                  <View
+                    key={item.key}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      minWidth: 0,
+                      flexShrink: 1,
+                    }}
+                  >
+                    {index > 0 ? (
+                      <Text
+                        style={{
+                          marginHorizontal: 6,
+                          fontSize: 12,
+                          lineHeight: 16,
+                          color: view.theme.colors.foregroundMuted,
+                        }}
+                      >
+                        {"\u00b7"}
+                      </Text>
+                    ) : null}
+                    <Icon
+                      name={item.icon}
+                      size={12}
+                      color={item.color ?? view.theme.colors.foregroundMuted}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        marginLeft: 3,
+                        fontSize: 12,
+                        lineHeight: 16,
+                        flexShrink: 1,
+                        color: item.color ?? view.theme.colors.foregroundMuted,
+                      }}
+                    >
+                      {item.text}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
+            ) : null}
           </View>
         </Pressable>
         {trailingText ? (
