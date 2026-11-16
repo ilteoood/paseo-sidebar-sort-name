@@ -1,5 +1,10 @@
 import type { PluginProjectSnapshot, PluginWorkspaceSnapshot } from "@getpaseo/plugin";
+import { workspaceSortLabels, workspaceSorts } from "../shared/preferences";
 import type { TitleSource, WorkspaceSort } from "../shared/preferences";
+
+export const workspaceSortChoices: readonly WorkspaceSort[] = [...workspaceSorts].sort((left, right) =>
+  workspaceSortLabels[left].localeCompare(workspaceSortLabels[right]),
+);
 
 type Order = (left: PluginWorkspaceSnapshot, right: PluginWorkspaceSnapshot) => number;
 

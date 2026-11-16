@@ -35,7 +35,6 @@ import {
   titleSources,
   trailingLabels,
   workspaceSortLabels,
-  workspaceSorts,
   type Grouping,
   type Preferences,
   type RowItem,
@@ -48,6 +47,7 @@ import {
   compareProjectNames,
   workspaceComparator,
   workspaceDisplayName,
+  workspaceSortChoices,
 } from "./workspace-sort";
 
 const hoverTint = "rgba(127, 127, 127, 0.08)";
@@ -1113,7 +1113,7 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
         apply({ grouping: option }), groupingIcons);
     }
     if (page === "sort") {
-      return optionEntries(workspaceSorts, workspaceSortLabels, values.workspaceSort, (option) =>
+      return optionEntries(workspaceSortChoices, workspaceSortLabels, values.workspaceSort, (option) =>
         apply({ workspaceSort: option }));
     }
     if (page === "title") {
