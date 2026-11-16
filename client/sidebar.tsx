@@ -13,6 +13,7 @@ import {
   type PluginSidebarViewProps,
   type ProjectRef,
   type WorkspaceRef,
+  useRpc,
 } from "@getpaseo/plugin/client";
 import {
   Icon,
@@ -23,6 +24,7 @@ import {
   useToast,
 } from "@getpaseo/plugin/client/ui";
 import { preferences, workspaceSorts, type WorkspaceSort } from "../shared/preferences";
+import { removeProjectRpc } from "../shared/project-removal";
 import {
   compareProjectNames,
   workspaceDisplayName,
@@ -344,6 +346,40 @@ function FloatingMenu({
   );
 }
 
+function DialogFooter({
+  confirmLabel,
+  confirmColor,
+  view,
+  onCancel,
+  onConfirm,
+}: {
+  confirmLabel: string;
+  confirmColor: string;
+  view: PluginSidebarViewProps;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { colors } = view.theme;
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onCancel}
+        style={{ ...dialogButton, cursor: "pointer" }}
+      >
+        <Text style={{ fontSize: 14, color: colors.foregroundMuted }}>Cancel</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onConfirm}
+        style={{ ...dialogButton, cursor: "pointer", backgroundColor: colors.surface2 }}
+      >
+        <Text style={{ fontSize: 14, color: confirmColor }}>{confirmLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function RenameForm({
   initialName,
   view,
@@ -377,26 +413,45 @@ function RenameForm({
           color: colors.foreground,
         }}
       />
-      <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onCancel}
-          style={{ ...dialogButton, cursor: "pointer" }}
-        >
-          <Text style={{ fontSize: 14, color: colors.foregroundMuted }}>Cancel</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={submit}
-          style={{ ...dialogButton, cursor: "pointer", backgroundColor: colors.surface2 }}
-        >
-          <Text style={{ fontSize: 14, color: colors.foreground }}>Rename</Text>
-        </Pressable>
-      </View>
+      <DialogFooter
+        confirmLabel="Rename"
+        confirmColor={colors.foreground}
+        view={view}
+        onCancel={onCancel}
+        onConfirm={submit}
+      />
     </Modal.Content>
   );
 }
 
+function RemoveProjectDialog({
+  projectName,
+  view,
+  onCancel,
+  onConfirm,
+}: {
+  projectName: string;
+  view: PluginSidebarViewProps;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { colors } = view.theme;
+  return (
+    <Modal.Content contentContainerStyle={{ gap: 12 }} scrollable={false}>
+      <Text style={{ fontSize: 14, color: colors.foreground }}>{projectName}</Text>
+      <Text style={{ fontSize: 13, color: colors.foregroundMuted }}>
+        Files on disk will not be changed.
+      </Text>
+      <DialogFooter
+        confirmLabel="Remove"
+        confirmColor={colors.statusDanger}
+        view={view}
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />
+    </Modal.Content>
+  );
+}
 function WorkspaceRow({
   reference,
   indented,
@@ -573,6 +628,11 @@ function WorkspaceRow({
   );
 }
 
+function removalMessage(removedWorkspaceCount: number): string {
+  if (removedWorkspaceCount === 0) return "Project removed";
+  const noun = removedWorkspaceCount === 1 ? "workspace" : "workspaces";
+  return `Project removed with ${removedWorkspaceCount} ${noun}`;
+}
 function ProjectSection({
   reference,
   sort,
@@ -590,7 +650,11 @@ function ProjectSection({
 }) {
   const project = useProject(reference);
   const paseo = usePaseo();
+  const toast = useToast();
+  const removeProject = useRpc(removeProjectRpc);
   const reportFailure = useFailureReporter();
+  const kebabRef = useRef<View | null>(null);
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const workspaces = useWorkspaces({
@@ -602,6 +666,13 @@ function ProjectSection({
   });
   if (!project || workspaces.length === 0) return null;
   const showsChrome = hovered || isTouchPlatform;
+  const confirmRemoval = () => {
+    setConfirmingRemoval(false);
+    reportFailure("Could not remove the project", async () => {
+      const { removedWorkspaceCount } = await removeProject({ projectId: reference.id });
+      toast.show(removalMessage(removedWorkspaceCount), { variant: "success" });
+    });
+  };
   return (
     <View style={{ paddingBottom: 12 }}>
       <View
@@ -652,6 +723,20 @@ function ProjectSection({
             )
           }
         />
+        <TrailingAction
+          actionRef={kebabRef}
+          icon="EllipsisVertical"
+          iconSize={16}
+          label={`Actions for ${project.displayName}`}
+          visible={showsChrome}
+          view={view}
+          onHoverChange={setHovered}
+          onPress={() =>
+            onOpenActions(kebabRef.current, [
+              { icon: "Trash2", label: "Remove project", onPress: () => setConfirmingRemoval(true) },
+            ])
+          }
+        />
       </View>
       {collapsed
         ? null
@@ -664,6 +749,22 @@ function ProjectSection({
               onOpenActions={onOpenActions}
             />
           ))}
+      {confirmingRemoval ? (
+        <Modal
+          title="Remove project?"
+          open
+          onOpenChange={(open) => {
+            if (!open) setConfirmingRemoval(false);
+          }}
+        >
+          <RemoveProjectDialog
+            projectName={project.displayName}
+            view={view}
+            onCancel={() => setConfirmingRemoval(false)}
+            onConfirm={confirmRemoval}
+          />
+        </Modal>
+      ) : null}
     </View>
   );
 }
