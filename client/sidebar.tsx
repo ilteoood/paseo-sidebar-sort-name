@@ -107,6 +107,7 @@ const menuRow = {
   flexDirection: "row",
   alignItems: "center",
   gap: 8,
+  marginHorizontal: 4,
   paddingHorizontal: 8,
   borderRadius: 6,
 } as const;
@@ -434,7 +435,7 @@ function FloatingMenu({
         <ScrollView
           key={page}
           style={{ borderRadius: 8, overflow: "hidden" }}
-          contentContainerStyle={{ padding: menuPagePadding }}
+          contentContainerStyle={{ paddingVertical: menuPagePadding }}
         >
           {entries.map((entry, index) => (
             <View key={`${index}-${entry.label}`}>
@@ -457,10 +458,10 @@ function FloatingMenu({
                   if (!entry.keepOpen) onDismiss();
                   entry.onPress();
                 }}
-                style={({ pressed }) => ({
+                style={({ hovered, pressed }: ActionPressState) => ({
                   ...menuRow,
                   cursor: "pointer",
-                  backgroundColor: pressed ? pressedTint : undefined,
+                  backgroundColor: hovered || pressed ? colors.surface2 : undefined,
                 })}
               >
                 {entry.icon ? (
