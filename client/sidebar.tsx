@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import type { WorkspaceIndicator } from "@getpaseo/plugin";
 import {
@@ -63,14 +63,15 @@ const workspaceRow = {
 } as const;
 const leadingSlot = { width: 16, height: 20, alignItems: "center", justifyContent: "center" } as const;
 const trailingSlot = { width: 24, height: 24, alignItems: "center", justifyContent: "center" } as const;
+const isTouchPlatform = Platform.OS !== "web";
+const menuRowMinHeight = isTouchPlatform ? 44 : 28;
 const menuRow = {
-  minHeight: 36,
+  minHeight: menuRowMinHeight,
   flexDirection: "row",
   alignItems: "center",
   gap: 8,
-  paddingVertical: 8,
   paddingHorizontal: 8,
-  borderRadius: 8,
+  borderRadius: 6,
 } as const;
 const dialogButton = {
   minHeight: 36,
@@ -80,7 +81,11 @@ const dialogButton = {
   justifyContent: "center",
 } as const;
 
-const isTouchPlatform = Platform.OS !== "web";
+const menuWidth = 240;
+const menuInset = 8;
+const menuGap = 4;
+const menuPagePadding = 4;
+const menuBorderWidth = 1;
 const filledDotSize = 6;
 const doneDotOpacity = 0.3;
 const titleIdleOpacity = 0.76;
@@ -160,34 +165,117 @@ function StatusIndicator({
     />
   );
 }
+type Rect = {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+};
 
-function MenuList({
-  entries,
+type MenuPlacement = {
+  readonly top: number;
+  readonly left: number;
+  readonly width: number;
+};
+
+type MenuRequest = {
+  readonly node: View | null;
+  readonly entries: readonly MenuEntry[];
+  readonly placement: MenuPlacement;
+};
+
+type OpenMenu = (node: View | null, entries: readonly MenuEntry[]) => void;
+
+function measureInWindow(node: View, receive: (rect: Rect) => void) {
+  node.measureInWindow((left, top, width, height) => receive({ left, top, width, height }));
+}
+
+function menuPlacement(root: Rect, anchor: Rect, cardHeight: number): MenuPlacement {
+  const width = Math.min(menuWidth, root.width - menuInset * 2);
+  const below = anchor.top - root.top + anchor.height + menuGap;
+  return {
+    top:
+      below + cardHeight <= root.height
+        ? below
+        : Math.max(menuInset, anchor.top - root.top - menuGap - cardHeight),
+    left: Math.min(
+      Math.max(menuInset, anchor.left - root.left + anchor.width - width),
+      root.width - width - menuInset,
+    ),
+    width,
+  };
+}
+
+// shortcut: dismissal is click-only, because Escape would need DOM typings this plugin does not load.
+function FloatingMenu({
+  request,
   view,
+  onDismiss,
 }: {
-  entries: readonly MenuEntry[];
+  request: MenuRequest;
   view: PluginSidebarViewProps;
+  onDismiss: () => void;
 }) {
   const { colors } = view.theme;
+  const { entries, placement } = request;
   return (
-    <Modal.Content contentContainerStyle={{ gap: 2 }} scrollable={false}>
-      {entries.map((entry, index) => (
-        <Pressable
-          key={index}
-          accessibilityRole="button"
-          accessibilityState={entry.selected === undefined ? undefined : { selected: entry.selected }}
-          onPress={entry.onPress}
-          style={{ ...menuRow, cursor: "pointer" }}
-        >
-          {entry.icon ? (
-            <Icon name={entry.icon} size={16} color={colors.foregroundMuted} />
-          ) : (
-            <View style={{ width: 16 }} />
-          )}
-          <Text style={{ fontSize: 14, flex: 1, color: colors.foreground }}>{entry.label}</Text>
-        </Pressable>
-      ))}
-    </Modal.Content>
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Close the menu"
+        onPress={onDismiss}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
+      />
+      <View
+        accessibilityRole="menu"
+        accessibilityViewIsModal
+        style={{
+          position: "absolute",
+          zIndex: 11,
+          top: placement.top,
+          left: placement.left,
+          width: placement.width,
+          padding: menuPagePadding,
+          borderWidth: menuBorderWidth,
+          borderRadius: 8,
+          borderColor: colors.border,
+          backgroundColor: colors.surface1,
+          shadowColor: "rgba(0, 0, 0, 0.20)",
+          shadowOffset: { width: 0, height: 4 },
+          shadowRadius: 8,
+          elevation: 8,
+        }}
+      >
+        {entries.map((entry, index) => (
+          <Pressable
+            key={index}
+            accessibilityRole="button"
+            accessibilityState={
+              entry.selected === undefined ? undefined : { selected: entry.selected }
+            }
+            onPress={() => {
+              onDismiss();
+              entry.onPress();
+            }}
+            style={({ pressed }) => ({
+              ...menuRow,
+              cursor: "pointer",
+              backgroundColor: pressed ? pressedTint : undefined,
+            })}
+          >
+            {entry.icon ? (
+              <Icon name={entry.icon} size={16} color={colors.foregroundMuted} />
+            ) : (
+              <View style={{ width: 16 }} />
+            )}
+            <Text numberOfLines={1} style={{ fontSize: 14, flex: 1, color: colors.foreground }}>
+              {entry.label}
+            </Text>
+            {entry.selected ? <Icon name="Check" size={16} color={colors.foregroundMuted} /> : null}
+          </Pressable>
+        ))}
+      </View>
+    </>
   );
 }
 
@@ -244,23 +332,24 @@ function RenameForm({
   );
 }
 
-type WorkspaceSheet = "menu" | "rename";
-
 function WorkspaceRow({
   reference,
   indented,
   view,
+  onOpenActions,
 }: {
   reference: WorkspaceRef;
   indented?: boolean;
   view: PluginSidebarViewProps;
+  onOpenActions: OpenMenu;
 }) {
   const workspace = useWorkspace(reference);
   const paseo = usePaseo();
   const toast = useToast();
   const reportFailure = useFailureReporter();
+  const kebabRef = useRef<View | null>(null);
   const [hovered, setHovered] = useState(false);
-  const [sheet, setSheet] = useState<WorkspaceSheet | null>(null);
+  const [renaming, setRenaming] = useState(false);
   const active = view.active.workspace?.key === reference.key;
   if (!workspace) return null;
 
@@ -271,48 +360,57 @@ function WorkspaceRow({
   const workspaceActions = () => paseo.workspaces.ref(reference);
   const submitRename = (draft: string) => {
     const name = draft.trim();
+    setRenaming(false);
     if (name !== label) {
-      reportFailure("Could not rename the workspace", () => workspaceActions().setTitle(name || null));
+      reportFailure("Could not rename the workspace", () =>
+        workspaceActions().setTitle(name || null),
+      );
     }
-    setSheet(null);
   };
-  const menuEntry = (icon: string, entryLabel: string, run: () => void): MenuEntry => ({
-    icon,
-    label: entryLabel,
-    onPress: () => {
-      setSheet(null);
-      run();
-    },
-  });
   const entries: readonly MenuEntry[] = [
-    menuEntry("Plus", "New workspace", () =>
-      reportFailure("Could not open the new workspace screen", () =>
-        paseo.projects.ref(workspace.project).open(),
-      ),
-    ),
-    menuEntry("Copy", "Copy path", () =>
-      reportFailure("Could not copy the path", async () => {
-        await copyText(workspace.directory);
-        toast.show("Path copied", { variant: "success" });
-      }),
-    ),
+    {
+      icon: "Plus",
+      label: "New workspace",
+      onPress: () =>
+        reportFailure("Could not open the new workspace screen", () =>
+          paseo.projects.ref(workspace.project).open(),
+        ),
+    },
+    {
+      icon: "Copy",
+      label: "Copy path",
+      onPress: () =>
+        reportFailure("Could not copy the path", async () => {
+          await copyText(workspace.directory);
+          toast.show("Path copied", { variant: "success" });
+        }),
+    },
     ...(branch
       ? [
-          menuEntry("GitBranch", "Copy branch name", () =>
-            reportFailure("Could not copy the branch name", async () => {
-              await copyText(branch);
-              toast.show("Branch name copied", { variant: "success" });
-            }),
-          ),
+          {
+            icon: "GitBranch",
+            label: "Copy branch name",
+            onPress: () =>
+              reportFailure("Could not copy the branch name", async () => {
+                await copyText(branch);
+                toast.show("Branch name copied", { variant: "success" });
+              }),
+          },
         ]
       : []),
-    menuEntry("Pencil", "Rename workspace", () => setSheet("rename")),
-    menuEntry(pinned ? "PinOff" : "Pin", pinned ? "Unpin" : "Pin to top", () =>
-      reportFailure("Could not update the pin", () => workspaceActions().setPinned(!pinned)),
-    ),
-    menuEntry("Archive", "Archive", () =>
-      reportFailure("Could not archive the workspace", () => workspaceActions().archive()),
-    ),
+    { icon: "Pencil", label: "Rename workspace", onPress: () => setRenaming(true) },
+    {
+      icon: pinned ? "PinOff" : "Pin",
+      label: pinned ? "Unpin" : "Pin to top",
+      onPress: () =>
+        reportFailure("Could not update the pin", () => workspaceActions().setPinned(!pinned)),
+    },
+    {
+      icon: "Archive",
+      label: "Archive",
+      onPress: () =>
+        reportFailure("Could not archive the workspace", () => workspaceActions().archive()),
+    },
   ];
 
   return (
@@ -370,13 +468,14 @@ function WorkspaceRow({
           </View>
         </View>
         <Pressable
+          ref={kebabRef}
           accessibilityRole="button"
           accessibilityLabel={`Actions for ${label}`}
           onFocus={() => setHovered(true)}
           onBlur={() => setHovered(false)}
           onPress={(event) => {
             event.stopPropagation();
-            setSheet("menu");
+            onOpenActions(kebabRef.current, entries);
           }}
           pointerEvents={showsChrome ? "auto" : "none"}
           style={{ ...trailingSlot, cursor: "pointer", opacity: showsChrome ? 1 : 0 }}
@@ -384,26 +483,22 @@ function WorkspaceRow({
           <Icon name="EllipsisVertical" size={16} color={view.theme.colors.foregroundMuted} />
         </Pressable>
       </Pressable>
-      {sheet === null ? null : (
+      {renaming ? (
         <Modal
-          title={sheet === "rename" ? "Rename workspace" : label}
+          title="Rename workspace"
           open
           onOpenChange={(open) => {
-            if (!open) setSheet(null);
+            if (!open) setRenaming(false);
           }}
         >
-          {sheet === "rename" ? (
-            <RenameForm
-              initialName={label}
-              view={view}
-              onCancel={() => setSheet(null)}
-              onSubmit={submitRename}
-            />
-          ) : (
-            <MenuList entries={entries} view={view} />
-          )}
+          <RenameForm
+            initialName={label}
+            view={view}
+            onCancel={() => setRenaming(false)}
+            onSubmit={submitRename}
+          />
         </Modal>
-      )}
+      ) : null}
     </>
   );
 }
@@ -414,12 +509,14 @@ function ProjectSection({
   view,
   collapsed,
   onToggleCollapsed,
+  onOpenActions,
 }: {
   reference: ProjectRef;
   sort: WorkspaceSort;
   view: PluginSidebarViewProps;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  onOpenActions: OpenMenu;
 }) {
   const project = useProject(reference);
   const paseo = usePaseo();
@@ -486,7 +583,13 @@ function ProjectSection({
       {collapsed
         ? null
         : workspaces.map((workspace) => (
-            <WorkspaceRow key={workspace.key} reference={workspace} indented view={view} />
+            <WorkspaceRow
+              key={workspace.key}
+              reference={workspace}
+              indented
+              view={view}
+              onOpenActions={onOpenActions}
+            />
           ))}
     </View>
   );
@@ -495,7 +598,9 @@ function ProjectSection({
 export function SortedSidebar(view: PluginSidebarViewProps) {
   const settings = useSettings(preferences);
   const toast = useToast();
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const rootRef = useRef<View | null>(null);
+  const sortTriggerRef = useRef<View | null>(null);
+  const [menu, setMenu] = useState<MenuRequest | null>(null);
   const [collapsedProjects, setCollapsedProjects] = useState<readonly string[]>([]);
   const sort = settings.status === "ready" ? settings.values.workspaceSort : "name";
   const projects = useProjects({ orderBy: compareProjectNames });
@@ -508,25 +613,56 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
       current.includes(key) ? current.filter((other) => other !== key) : [...current, key],
     );
   const select = (option: WorkspaceSort) => {
-    setPickerOpen(false);
     if (settings.status !== "ready") return;
     void settings.save({ workspaceSort: option }, settings.revision).then((saved) => {
       if (!saved) toast.error("Could not save the workspace order");
     });
   };
+  const openMenu: OpenMenu = (node, entries) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const cardHeight =
+      entries.length * menuRow.minHeight + menuPagePadding * 2 + menuBorderWidth * 2;
+    measureInWindow(root, (rootRect) => {
+      const place = (anchor: Rect) =>
+        setMenu({ node, entries, placement: menuPlacement(rootRect, anchor, cardHeight) });
+      if (!node) {
+        place({ left: rootRect.left + rootRect.width, top: rootRect.top + menuInset, width: 0, height: 0 });
+        return;
+      }
+      measureInWindow(node, place);
+    });
+  };
   const { colors } = view.theme;
   return (
-    <>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 8, paddingTop: 2, paddingBottom: 16 }}>
+    <View ref={rootRef} collapsable={false} style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 8, paddingTop: 2, paddingBottom: 16 }}
+      >
         {pinned.length ? <SectionHeader title="Pinned" view={view} /> : null}
         {pinned.map((workspace) => (
-          <WorkspaceRow key={workspace.key} reference={workspace} view={view} />
+          <WorkspaceRow
+            key={workspace.key}
+            reference={workspace}
+            view={view}
+            onOpenActions={openMenu}
+          />
         ))}
         <SectionHeader title="Workspaces" view={view}>
           <Pressable
+            ref={sortTriggerRef}
             accessibilityRole="button"
             accessibilityLabel={`Sort workspaces: ${workspaceSortLabels[sort]}`}
-            onPress={() => setPickerOpen(true)}
+            onPress={() =>
+              openMenu(
+                sortTriggerRef.current,
+                workspaceSorts.map((option) => ({
+                  label: workspaceSortLabels[option],
+                  selected: option === sort,
+                  onPress: () => select(option),
+                })),
+              )
+            }
             style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 4, cursor: "pointer" }}
           >
             <Text style={{ fontSize: 12, color: colors.foregroundMuted }}>
@@ -543,22 +679,13 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
             view={view}
             collapsed={collapsedProjects.includes(project.key)}
             onToggleCollapsed={() => toggleCollapsed(project.key)}
+            onOpenActions={openMenu}
           />
         ))}
       </ScrollView>
-      {pickerOpen ? (
-        <Modal title="Sort workspaces" open onOpenChange={setPickerOpen}>
-          <MenuList
-            entries={workspaceSorts.map((option) => ({
-              icon: option === sort ? "Check" : undefined,
-              label: workspaceSortLabels[option],
-              selected: option === sort,
-              onPress: () => select(option),
-            }))}
-            view={view}
-          />
-        </Modal>
+      {menu ? (
+        <FloatingMenu request={menu} view={view} onDismiss={() => setMenu(null)} />
       ) : null}
-    </>
+    </View>
   );
 }
