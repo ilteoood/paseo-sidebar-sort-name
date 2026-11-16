@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
+import type { PressableStateCallbackType } from "react-native";
 import type { WorkspaceIndicator } from "@getpaseo/plugin";
 import {
   usePaseo,
@@ -62,12 +64,18 @@ const workspaceRow = {
   gap: 4,
 } as const;
 const leadingSlot = { width: 16, height: 20, alignItems: "center", justifyContent: "center" } as const;
-const trailingSlot = {
-  width: 32,
-  height: 32,
-  marginVertical: -6,
-  marginRight: -4,
+const trailingHitBox = {
+  width: 36,
+  height: 36,
+  marginVertical: -8,
+  marginRight: -6,
   alignSelf: "center",
+  alignItems: "center",
+  justifyContent: "center",
+} as const;
+const trailingHighlight = {
+  width: 24,
+  height: 24,
   borderRadius: 6,
   alignItems: "center",
   justifyContent: "center",
@@ -113,6 +121,8 @@ type PointerDocument = {
   removeEventListener: (type: string, listener: (event: { target: unknown }) => void) => void;
 };
 
+type ActionPressState = PressableStateCallbackType & { readonly hovered?: boolean };
+
 function useFailureReporter() {
   const toast = useToast();
   return (failureMessage: string, action: () => unknown): void => {
@@ -122,6 +132,58 @@ function useFailureReporter() {
         toast.error(error instanceof Error ? error.message : failureMessage);
       });
   };
+}
+
+function TrailingAction({
+  actionRef,
+  icon,
+  iconSize,
+  label,
+  visible,
+  view,
+  onHoverChange,
+  onPress,
+}: {
+  actionRef?: RefObject<View | null>;
+  icon: string;
+  iconSize: number;
+  label: string;
+  visible: boolean;
+  view: PluginSidebarViewProps;
+  onHoverChange: (hovered: boolean) => void;
+  onPress: () => void;
+}) {
+  const { colors } = view.theme;
+  return (
+    <Pressable
+      ref={actionRef}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onFocus={() => onHoverChange(true)}
+      onBlur={() => onHoverChange(false)}
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress();
+      }}
+      pointerEvents={visible ? "auto" : "none"}
+      style={({ hovered }: ActionPressState) => ({
+        ...trailingHitBox,
+        cursor: "pointer",
+        opacity: visible ? 1 : 0,
+      })}
+    >
+      {({ hovered, pressed }: ActionPressState) => (
+        <View
+          style={{
+            ...trailingHighlight,
+            backgroundColor: hovered || pressed ? colors.surface2 : undefined,
+          }}
+        >
+          <Icon name={icon} size={iconSize} color={colors.foregroundMuted} />
+        </View>
+      )}
+    </Pressable>
+  );
 }
 
 function SectionHeader({
@@ -477,21 +539,16 @@ function WorkspaceRow({
             ) : null}
           </View>
         </View>
-        <Pressable
-          ref={kebabRef}
-          accessibilityRole="button"
-          accessibilityLabel={`Actions for ${label}`}
-          onFocus={() => setHovered(true)}
-          onBlur={() => setHovered(false)}
-          onPress={(event) => {
-            event.stopPropagation();
-            onOpenActions(kebabRef.current, entries);
-          }}
-          pointerEvents={showsChrome ? "auto" : "none"}
-          style={{ ...trailingSlot, cursor: "pointer", opacity: showsChrome ? 1 : 0 }}
-        >
-          <Icon name="EllipsisVertical" size={16} color={view.theme.colors.foregroundMuted} />
-        </Pressable>
+        <TrailingAction
+          actionRef={kebabRef}
+          icon="EllipsisVertical"
+          iconSize={16}
+          label={`Actions for ${label}`}
+          visible={showsChrome}
+          view={view}
+          onHoverChange={setHovered}
+          onPress={() => onOpenActions(kebabRef.current, entries)}
+        />
       </Pressable>
       {renaming ? (
         <Modal
@@ -573,22 +630,19 @@ function ProjectSection({
         >
           {project.displayName}
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`New workspace in ${project.displayName}`}
-          onFocus={() => setHovered(true)}
-          onBlur={() => setHovered(false)}
-          onPress={(event) => {
-            event.stopPropagation();
+        <TrailingAction
+          icon="Plus"
+          iconSize={15}
+          label={`New workspace in ${project.displayName}`}
+          visible={showsChrome}
+          view={view}
+          onHoverChange={setHovered}
+          onPress={() =>
             reportFailure("Could not open the new workspace screen", () =>
               paseo.projects.ref(reference).open(),
-            );
-          }}
-          pointerEvents={showsChrome ? "auto" : "none"}
-          style={{ ...trailingSlot, cursor: "pointer", opacity: showsChrome ? 1 : 0 }}
-        >
-          <Icon name="Plus" size={15} color={view.theme.colors.foregroundMuted} />
-        </Pressable>
+            )
+          }
+        />
       </Pressable>
       {collapsed
         ? null
