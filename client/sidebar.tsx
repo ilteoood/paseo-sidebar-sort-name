@@ -1014,6 +1014,7 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
   const settings = useSettings(preferences);
   const toast = useToast();
   const hosts = useHosts();
+  const onlineHosts = hosts.filter((host) => host.status === "online");
   const hostLabels = new Map(hosts.map((host) => [host.serverId, host.label]));
   const rootRef = useRef<View | null>(null);
   const displayTriggerRef = useRef<View | null>(null);
@@ -1157,7 +1158,7 @@ export function SortedSidebar(view: PluginSidebarViewProps) {
           keepOpen: true,
           onPress: () => apply({ hostFilters: [] }),
         },
-        ...hosts.map((host) => ({
+        ...onlineHosts.map((host) => ({
           label: host.label,
           selected: values.hostFilters.includes(host.serverId),
           keepOpen: true,
