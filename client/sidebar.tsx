@@ -39,7 +39,7 @@ import {
   menuRowMinHeight,
 } from "./sidebar-styles.ts";
 import { useNow } from "./use-now.ts";
-import { workspaceComparator } from "./workspace-sort.ts";
+import { projectsInGroupRank, workspaceComparator } from "./workspace-sort.ts";
 
 type StatusBucket = WorkspaceIndicator;
 
@@ -206,12 +206,14 @@ const projectMeta = useMemo(() => {
         : null,
     [statusGroups, values.grouping],
   );
-const projectByKey = useMemo(() => {
+  const projectByKey = useMemo(() => {
     if (values.grouping !== "project") return null;
-    const groupByKey = new Map<string, (typeof statusGroups)[number]>();
-    for (const group of statusGroups) groupByKey.set(group.key, group);
-    return allProjects.filter((project) => groupByKey.has(project.key));
-  }, [allProjects, statusGroups, values.grouping]);
+    const groupedKeys = statusGroups.map((group) => group.key);
+    if (values.workspaceSort === "name") {
+      return allProjects.filter((project) => groupedKeys.includes(project.key));
+    }
+    return projectsInGroupRank(allProjects, groupedKeys);
+  }, [allProjects, statusGroups, values.grouping, values.workspaceSort]);
 
   const display: RowDisplay = {
     titleSource: values.titleSource,

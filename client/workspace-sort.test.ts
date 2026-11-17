@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { PluginWorkspaceSnapshot } from "@getpaseo/plugin";
-import { compareByName, workspaceComparator, workspaceDisplayName } from "./workspace-sort.ts";
+import {
+  compareByName,
+  projectsInGroupRank,
+  workspaceComparator,
+  workspaceDisplayName,
+} from "./workspace-sort.ts";
 
 function workspace(fields: Partial<PluginWorkspaceSnapshot>): PluginWorkspaceSnapshot {
   return {
@@ -41,5 +46,15 @@ test("sorts by name, newest prompt first, and newest creation first", () => {
   assert.deepEqual(
     [untouched, older, newer].sort(workspaceComparator("lastPrompt", "title")).map((item) => item.name),
     ["beta", "alpha", "gamma"],
+  );
+});
+
+test("ranks projects by the group order and drops the ones without a group", () => {
+  const project = (key: string) => ({ kind: "project", key, hostId: "host", id: key }) as const;
+  const projects = [project("alpha"), project("beta"), project("gamma")];
+
+  assert.deepEqual(
+    projectsInGroupRank(projects, ["beta", "alpha"]).map((item) => item.key),
+    ["beta", "alpha"],
   );
 });

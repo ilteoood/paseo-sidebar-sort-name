@@ -1,4 +1,5 @@
-import type { PluginProjectSnapshot, PluginWorkspaceSnapshot } from "@getpaseo/plugin";
+import type { PluginWorkspaceSnapshot } from "@getpaseo/plugin";
+import type { ProjectRef } from "@getpaseo/plugin/client";
 import type { TitleSource, WorkspaceSort } from "../shared/preferences.ts";
 
 type Order = (left: PluginWorkspaceSnapshot, right: PluginWorkspaceSnapshot) => number;
@@ -24,7 +25,7 @@ export function workspaceDisplayName(
 
 
 export function workspaceComparator(sort: WorkspaceSort, titleSource: TitleSource): Order {
-if (sort === "created") {
+  if (sort === "created") {
     return (left, right) => newestFirst(left.createdAt, right.createdAt);
   }
   if (sort === "lastPrompt") {
@@ -37,9 +38,13 @@ if (sort === "created") {
     );
 }
 
-export function compareProjectNames(
-  left: PluginProjectSnapshot,
-  right: PluginProjectSnapshot,
-): number {
-  return compareByName(left.displayName, right.displayName);
+export function projectsInGroupRank(
+  projects: readonly ProjectRef[],
+  groupedProjectKeys: readonly string[],
+): readonly ProjectRef[] {
+  const projectsByKey = new Map(projects.map((project) => [project.key, project]));
+  return groupedProjectKeys.flatMap((key) => {
+    const project = projectsByKey.get(key);
+    return project ? [project] : [];
+  });
 }
