@@ -17,22 +17,22 @@ export const sectionHeader = {
   paddingRight: 4,
 } as const;
 export const projectRow = {
-  minHeight: 36,
+  minHeight: 28,
   flexDirection: "row",
   alignItems: "center",
   gap: 8,
-  paddingVertical: 8,
+  paddingVertical: 4,
   paddingRight: 4,
   paddingLeft: 8,
   borderRadius: 8,
-  marginBottom: 4,
+  marginBottom: 2,
 } as const;
 export const workspaceRow = {
-  minHeight: 36,
+  minHeight: 28,
   flexDirection: "row",
   alignItems: "center",
   marginBottom: 2,
-  paddingVertical: 8,
+  paddingVertical: 4,
   paddingRight: 4,
   borderRadius: 8,
   gap: 4,
