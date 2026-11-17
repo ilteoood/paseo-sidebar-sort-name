@@ -19,13 +19,15 @@ test("orders names the way people read them", () => {
   assert.deepEqual(names.sort(compareByName), ["workspace1", "Workspace2", "workspace10"]);
 });
 
-test("shows the custom title, the branch, or the workspace name", () => {
-  const titled = workspace({ title: "Fix login", branch: "fix/login" });
-  assert.equal(workspaceDisplayName(titled, "title"), "Fix login");
+test("title mode ignores the custom title; branch mode prefers the branch name", () => {
+  const titled = workspace({ name: "workspace", title: "Fix login", branch: "fix/login" });
+  assert.equal(workspaceDisplayName(titled, "title"), "workspace");
   assert.equal(workspaceDisplayName(titled, "branch"), "fix/login");
   const untitled = workspace({ name: "paseo-1a2b" });
   assert.equal(workspaceDisplayName(untitled, "title"), "paseo-1a2b");
   assert.equal(workspaceDisplayName(untitled, "branch"), "paseo-1a2b");
+  const noBranch = workspace({ name: "paseo-3c4d", title: "set but undocumented on the row" });
+  assert.equal(workspaceDisplayName(noBranch, "branch"), "paseo-3c4d");
 });
 
 test("sorts by name, newest prompt first, and newest creation first", () => {

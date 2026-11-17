@@ -12,6 +12,7 @@ import {
   useWorkspace,
 } from "@getpaseo/plugin/client";
 import { Icon, Modal, copyText, useToast } from "@getpaseo/plugin/client/ui";
+import { Spinner } from "./spinner.tsx";
 import type { Preferences, TitleSource, TrailingItem } from "../shared/preferences.ts";
 import { removeProjectRpc } from "../shared/project-removal.ts";
 import { RemoveProjectDialog, RenameForm } from "./dialogs.tsx";
@@ -28,9 +29,12 @@ import {
   pressedTint,
   projectRow,
   runningIconSize,
-  sectionHeader,
+sectionHeader,
   selectedTint,
+  statusGroupHeader,
+  statusHeaderLeading,
   statusIconSize,
+  archiveAction,
   titleIdleOpacity,
   trailingHighlight,
   trailingHitBox,
@@ -167,6 +171,63 @@ export function SectionHeader({
     </View>
   );
 }
+export function StatusGroupHeader({
+  title,
+  color,
+  leadingIconName,
+  collapsed,
+  count,
+  view,
+  onToggle,
+}: {
+  title: string;
+  color: string;
+  leadingIconName: string;
+  collapsed: boolean;
+  count: number;
+  view: PluginSidebarViewProps;
+  onToggle: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${collapsed ? "Expand" : "Collapse"} ${title}`}
+      accessibilityState={{ expanded: !collapsed }}
+      onPress={onToggle}
+      style={{ padding: 0 }}
+    >
+      <View style={statusGroupHeader}>
+        <Icon
+          name={collapsed ? "ChevronRight" : "ChevronDown"}
+          size={12}
+          color={view.theme.colors.foregroundMuted}
+        />
+        <View style={statusHeaderLeading}>
+{leadingIconName === "LoaderCircle" ? (
+            <Spinner size={12} color={color} />
+          ) : (
+            <Icon name={leadingIconName} size={12} color={color} />
+          )}
+</View>
+        <Text
+          numberOfLines={1}
+          style={{
+            fontSize: 12,
+            flex: 1,
+            color: view.theme.colors.foregroundMuted,
+            textTransform: "uppercase",
+            letterSpacing: 0.4,
+          }}
+        >
+          {title}
+        </Text>
+        <Text style={{ fontSize: 11, color: view.theme.colors.foregroundMuted, opacity: 0.7 }}>
+          {count}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
 
 function StatusIndicator({
   indicator,
@@ -180,7 +241,7 @@ function StatusIndicator({
     return <Icon name="CircleAlert" size={statusIconSize} color={colors.statusWarning} />;
   }
   if (indicator === "running") {
-    return <Icon name="LoaderCircle" size={runningIconSize} color={colors.foregroundMuted} />;
+    return <Spinner size={runningIconSize} color={colors.statusWarning} />;
   }
   const fill =
     indicator === "attention"
@@ -277,7 +338,7 @@ export function WorkspaceRow({
 
   const { titleSource, rowItems, trailing } = display;
   const label = workspaceDisplayName(workspace, titleSource);
-  const customName = workspaceDisplayName(workspace, "title");
+  const customName = workspace.title ?? workspace.name;
   const branch = workspace.branch;
   const pinned = workspace.pinnedAt !== null;
   const hostLabel = hostLabels.get(workspace.hostId) ?? workspace.hostId;
@@ -421,6 +482,43 @@ export function WorkspaceRow({
             {trailingText}
           </Text>
         ) : null}
+<Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Archive ${label}`}
+            accessibilityState={{ disabled: workspace.archivingAt !== null }}
+            disabled={workspace.archivingAt !== null}
+            onHoverIn={() => chrome.setHovered(true)}
+            onHoverOut={() => chrome.setHovered(false)}
+            onPress={() =>
+              reportFailure("Could not archive the workspace", () => workspaceActions().archive())
+            }
+            hitSlop={4}
+            style={({ hovered, pressed }: ActionPressState) => ({
+              ...archiveAction,
+              marginLeft: !isTouchPlatform && !chrome.showsChrome ? -22 : 0,
+              opacity: workspace.archivingAt !== null ? 0.5 : chrome.showsChrome ? 1 : isTouchPlatform ? 1 : 0,
+              cursor: "pointer",
+            })}
+          >
+            {({ hovered: h, pressed: p }: ActionPressState) => (
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: h || p ? view.theme.colors.surface2 : undefined,
+                }}
+              >
+                <Icon
+                  name={workspace.archivingAt !== null ? "LoaderCircle" : "Archive"}
+                  size={14}
+                  color={view.theme.colors.foregroundMuted}
+                />
+              </View>
+            )}
+          </Pressable>
         <TrailingAction
           icon="EllipsisVertical"
           iconSize={16}
@@ -479,6 +577,7 @@ export function ProjectHeaderRow({
   collapsed,
   onToggleCollapsed,
   onOpenActions,
+  meta,
   menuAnchor,
 }: {
   reference: ProjectRef;
@@ -487,6 +586,7 @@ export function ProjectHeaderRow({
   onToggleCollapsed: () => void;
   onOpenActions: OpenMenu;
   menuAnchor: View | null;
+meta?: { readonly isArchiving: boolean; readonly statusBucket: WorkspaceIndicator | null } | null;
 }) {
   const project = useProject(reference);
   const paseo = usePaseo();
@@ -542,7 +642,17 @@ export function ProjectHeaderRow({
           style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer" }}
         >
           <View style={leadingSlot}>
-            {chrome.showsChrome ? (
+{meta?.isArchiving ? (
+              <Spinner size={16} color={view.theme.colors.foregroundMuted} />
+            ) : meta?.statusBucket === "running" ? (
+              <Spinner size={16} color={view.theme.colors.statusWarning} />
+            ) : meta?.statusBucket === "needs_input" ? (
+              <Icon name="CircleAlert" size={16} color={view.theme.colors.statusWarning} />
+            ) : meta?.statusBucket === "failed" ? (
+              <Icon name="CircleX" size={16} color={view.theme.colors.statusDanger} />
+            ) : meta?.statusBucket === "attention" ? (
+              <Icon name="CircleCheck" size={16} color={view.theme.colors.statusSuccess} />
+            ) : chrome.showsChrome ? (
               <Icon
                 name={collapsed ? "ChevronRight" : "ChevronDown"}
                 size={14}

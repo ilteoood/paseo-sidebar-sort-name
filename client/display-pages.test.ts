@@ -63,7 +63,7 @@ test("keeps the Sort entry under both groupings", () => {
 
 test("lists the sort options in label order", () => {
   const labels = show({ page: "sort" }).entries.map((entry) => entry.label);
-  assert.deepEqual(labels, ["Sort", "Created", "Last prompted", "Name"]);
+assert.deepEqual(labels, ["Sort", "Created", "Last prompted", "Name"]);
 });
 
 test("filters by the projects it is given", () => {

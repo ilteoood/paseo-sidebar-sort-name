@@ -1,7 +1,6 @@
 import type { PluginProjectSnapshot, PluginWorkspaceSnapshot } from "@getpaseo/plugin";
 import type { TitleSource, WorkspaceSort } from "../shared/preferences.ts";
 
-
 type Order = (left: PluginWorkspaceSnapshot, right: PluginWorkspaceSnapshot) => number;
 
 function newestFirst(left: string | null, right: string | null): number {
@@ -20,11 +19,12 @@ export function workspaceDisplayName(
   titleSource: TitleSource,
 ): string {
   if (titleSource === "branch") return workspace.branch ?? workspace.name;
-  return workspace.title ?? workspace.name;
+  return workspace.name;
 }
 
+
 export function workspaceComparator(sort: WorkspaceSort, titleSource: TitleSource): Order {
-  if (sort === "created") {
+if (sort === "created") {
     return (left, right) => newestFirst(left.createdAt, right.createdAt);
   }
   if (sort === "lastPrompt") {

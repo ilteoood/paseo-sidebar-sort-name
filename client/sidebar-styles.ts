@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { Platform, type Animated } from "react-native";
 
 export const hoverTint = "rgba(127, 127, 127, 0.08)";
 export const pressedTint = "rgba(127, 127, 127, 0.14)";
@@ -38,7 +38,36 @@ export const workspaceRow = {
   gap: 4,
 } as const;
 export const groupSpacing = { paddingBottom: 12 } as const;
-export const emptyNotice = { fontSize: 13, paddingHorizontal: 8, paddingVertical: 8 } as const;
+export const emptyNotice = { fontSize: 12 } as const;
+export const emptyNoticeCard = { fontSize: 14, lineHeight: 20, fontWeight: "600" } as const;
+export const emptyCard = {
+  paddingHorizontal: 16,
+  paddingVertical: 20,
+  marginHorizontal: 8,
+  marginTop: 4,
+  marginBottom: 8,
+  borderRadius: 8,
+  gap: 4,
+} as const;
+export const statusGroupHeader = {
+  minHeight: 32,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+  paddingHorizontal: 8,
+  paddingTop: 6,
+  paddingBottom: 2,
+  cursor: "pointer",
+} as const;
+export const archiveAction = {
+  width: 22,
+  height: 28,
+  marginVertical: -8,
+  marginRight: -2,
+  alignItems: "center",
+  justifyContent: "center",
+} as const;
+export const statusHeaderLeading = { width: 14, height: 14, alignItems: "center", justifyContent: "center" } as const;
 export const leadingSlot = { width: 16, height: 20, alignItems: "center", justifyContent: "center" } as const;
 export const trailingHitBox = {
   width: 36,
@@ -91,3 +120,9 @@ export const doneDotOpacity = 0.3;
 export const titleIdleOpacity = 0.76;
 export const statusIconSize = 12;
 export const runningIconSize = 14;
+
+
+
+export const spinnerStyle = (rotation: Animated.AnimatedInterpolation<string>) => ({
+  transform: [{ rotate: rotation }],
+});

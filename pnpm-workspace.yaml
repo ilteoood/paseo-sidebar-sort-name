@@ -1,0 +1,5 @@
+minimumReleaseAgeExclude:
+  - '@getpaseo/client@0.16.0'
+  - '@getpaseo/plugin@0.16.0'
+  - '@getpaseo/protocol@0.16.0'
+  - '@getpaseo/relay@0.16.0'

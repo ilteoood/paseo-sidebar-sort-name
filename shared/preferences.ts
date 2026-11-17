@@ -14,7 +14,7 @@ export type RowItem = (typeof rowItems)[number];
 export type TrailingItem = (typeof trailingItems)[number];
 
 export const workspaceSortLabels: Record<WorkspaceSort, string> = {
-  name: "Name",
+name: "Name",
   created: "Created",
   lastPrompt: "Last prompted",
 };
@@ -42,7 +42,7 @@ const rowItemsSchema = z.object({
 });
 
 const preferencesSchema = z.object({
-  workspaceSort: z.enum(workspaceSorts).default("name"),
+workspaceSort: z.enum(workspaceSorts).default("name"),
   grouping: z.enum(groupings).default("project"),
   titleSource: z.enum(titleSources).default("title"),
   rowItems: rowItemsSchema.prefault({}),
