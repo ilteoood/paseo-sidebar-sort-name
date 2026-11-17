@@ -332,7 +332,7 @@ const projectMeta = useMemo(() => {
         key: `project:${reference.key}`,
         reference,
         collapsed,
-        endsGroup: collapsed || lastProject,
+        endsGroup: collapsed || !group,
         count: group?.items.length ?? 0,
       });
       if (collapsed || !group) return;
