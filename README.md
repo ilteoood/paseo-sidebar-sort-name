@@ -19,13 +19,13 @@ The default view: projects and workspaces sorted by name.
 
 ![Sidebar sorted by name with workspaces nested under their projects](docs/screenshots/sidebar-sorted.png)
 
-The same workspaces grouped by status, each group collapsible.
+Grouped by status instead: one collapsible header per status, carrying its workspace count.
 
-![Workspaces grouped by status with collapsible headers and counts](docs/screenshots/grouped-by-status.png)
+![Workspaces grouped by status, with a DONE header showing its count](docs/screenshots/grouped-by-status.png)
 
-The display menu, opened from the settings button in the Workspaces header.
+The Sort page of the display menu, opened from the settings button in the Workspaces header.
 
-![Floating display menu showing grouping, sort, title, show, and filter entries](docs/screenshots/display-menu.png)
+![Sort page of the display menu with Name selected](docs/screenshots/display-menu.png)
 
 ## Settings
 
