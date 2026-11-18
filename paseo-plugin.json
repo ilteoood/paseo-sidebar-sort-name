@@ -1,6 +1,6 @@
 {
-  "id": "paseo-sidebar-sort-name",
-  "name": "Sidebar sort by name",
+  "id": "paseo-sidebar-view",
+  "name": "Paseo sidebar view",
   "media": [],
   "requirements": {
     "paseo": ">=0.16.0"
